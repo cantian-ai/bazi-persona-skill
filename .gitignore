@@ -139,8 +139,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Generated personas
-personas/*
-!personas/.gitkeep
+personas/
 
 # Local skill installation artifacts
 .agents/

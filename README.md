@@ -3,12 +3,33 @@
 八字人格.skill（`bazi-persona-skill`）是一个用于“创建、更新、管理人格 Skill”的元技能项目。  
 它将出生信息快速转化为可执行的人格规则，并支持后续资料增强与版本回滚。
 
+`bazi-persona-skill` is a toolkit to create, update, and manage executable personas from Bazi data.  
+It turns birth information into actionable speaking/decision rules and supports continuous enhancement.
+
 用户亮点（不是术语）：
 - 零基础可用：不会八字也能创建。
 - 自然语言可用：直接说人话就能开始，不必记命令。
 - 作弊模式：像“上帝视角”一样问状态、关系、趋势，并可继续正常聊天。
 
-## 安装到 Codex（推荐）
+User highlights:
+- Beginner-friendly: create a persona even if you know nothing about Bazi.
+- Natural-language first: talk normally, no rigid command template required.
+- Cheatsheet mode: ask status/relationship/trend questions with a God-view while keeping normal chat.
+
+## 多语言支持 / Multilingual Support
+
+- 默认语言策略：`auto`（跟随用户输入语言）
+- 支持显式设置：`--lang zh` / `--lang en`
+- cheatsheet、列表、创建成功提示等高频交互已支持中英双语输出
+- Persona 规则保持人格一致，语言可随用户切换
+
+Language policy:
+- Default mode is `auto` (follows the user's language)
+- You can force output with `--lang zh` or `--lang en`
+- High-frequency flows (create/list/cheatsheet) support bilingual output
+- Persona style stays consistent while language can switch on demand
+
+## 安装到 Codex（推荐） / Install to Codex (Recommended)
 
 不需要手动复制目录，直接用 `npx skills`：
 
@@ -31,7 +52,7 @@ npm run install:global:codex
 npm run install:all
 ```
 
-## 快速开始
+## 快速开始 / Quick Start
 
 1. 安装依赖
 
@@ -63,13 +84,15 @@ npm run bazi -- --action create \
 
 说明：
 - 默认会在创建时自动排盘并落盘，不需要再手动跑 `bazi_calc`。
+- 默认生成人格目录：`~/.bazi-personas`（不会进入当前项目 Git）。
+- 如需写到项目内测试目录，可显式传：`--base-dir ./personas`。
 - `--birth-time` 可缺失，系统会自动进入缺时精简模式。
 - 创建与更新默认一次执行到底，不再弹“确认写入”二次交互。
 - 如需取消写入，可显式加 `--yes false`。
 - 若未传 `--relation`，交互模式会补问一次关系（可填“名人/无关系”）。
 - 创建成功后会自动提示“已切换角色模式”，用户可直接继续对话。
 
-一句话输入示例（给终端用户复制改）：
+一句话输入示例（给终端用户复制改） / One-line natural input example:
 
 ```text
 帮我创建八字人格：对象叫小A，1996年8月12日下午3点半，上海，女；我和她是同事。
@@ -99,7 +122,7 @@ npm run bazi -- --action flow \
   --at "2026-04-09 20:30"
 ```
 
-7. cheatsheet 模式（显式触发）
+7. cheatsheet 模式（显式触发） / Cheatsheet mode (explicit trigger)
 
 ```bash
 npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --mode on
@@ -120,6 +143,8 @@ npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --mode off
 说明：
 - `mode off` 会清空 cheatsheet 会话上下文，避免与正常聊天串味。
 - 记忆分层：`normal` 与 `cheatsheet` 独立，可用 `--action memory --scope normal|cheatsheet` 查看。
+- `mode off` clears cheatsheet session context to avoid mixing with normal chat.
+- Memory is layered: `normal` and `cheatsheet` are isolated.
 
 8. 合盘分析（两人格）
 

@@ -28,6 +28,7 @@ export interface PersonaMeta {
   slug: string;
   gender: Gender;
   relation?: string;
+  preferred_language?: "auto" | "zh" | "en";
   relationships?: string[];
   active_relationships?: string[];
   created_at: string;
@@ -46,6 +47,7 @@ export function createInitialMeta(input: {
   slug: string;
   gender: Gender;
   relation?: string;
+  preferredLanguage?: "auto" | "zh" | "en";
   relationships?: string[];
   activeRelationships?: string[];
   birth: BirthInfo;
@@ -65,6 +67,7 @@ export function createInitialMeta(input: {
     slug: input.slug,
     gender: input.gender,
     relation: input.relation,
+    preferred_language: input.preferredLanguage ?? "auto",
     relationships: normalizedRelationships.length > 0 ? normalizedRelationships : ["未指定关系"],
     active_relationships: activeRelationships.length > 0 ? activeRelationships : ["未指定关系"],
     created_at: now,
@@ -94,6 +97,7 @@ export function updateMeta(
     relationships?: string[];
     activeRelationships?: string[];
     appendLedger?: SourceLedgerItem[];
+    preferredLanguage?: "auto" | "zh" | "en";
   },
 ): PersonaMeta {
   const next = { ...current };
@@ -122,6 +126,9 @@ export function updateMeta(
   }
   if (input.accuracyMode) {
     next.accuracy_mode = input.accuracyMode;
+  }
+  if (input.preferredLanguage) {
+    next.preferred_language = input.preferredLanguage;
   }
   return next;
 }
@@ -171,6 +178,10 @@ function main(): void {
       slug,
       gender,
       relation: args.relation,
+      preferredLanguage:
+        args.lang === "zh" || args.lang === "en" || args.lang === "auto"
+          ? (args.lang as "zh" | "en" | "auto")
+          : "auto",
       birth: {
         date,
         time: args["birth-time"],
@@ -204,6 +215,10 @@ function main(): void {
     incrementChatSources: Number.parseInt(args["inc-chat"] ?? "0", 10),
     incrementTextSources: Number.parseInt(args["inc-text"] ?? "0", 10),
     accuracyMode: args["accuracy-mode"] as PersonaMeta["accuracy_mode"] | undefined,
+    preferredLanguage:
+      args.lang === "zh" || args.lang === "en" || args.lang === "auto"
+        ? (args.lang as "zh" | "en" | "auto")
+        : undefined,
   });
   writeJson(output, next);
   process.stdout.write(`已更新 meta.json：${output}\n`);

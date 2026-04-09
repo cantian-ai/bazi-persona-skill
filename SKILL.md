@@ -7,7 +7,7 @@ user-invocable: true
 allowed-tools: Bash
 ---
 
-# 八字人格.skill 创建器
+# 八字人格.skill 创建器 / Bazi Persona Skill Builder
 
 ## 对用户可见/不可见规则（最高优先级）
 
@@ -18,6 +18,7 @@ allowed-tools: Bash
 5. 任何“正在处理”提示都要简洁，禁止技术术语堆砌。
 6. 创建流程必须尽量用单次本地命令完成，避免让用户反复授权。
 7. 非必要不读取额外 markdown 文件；优先直接执行单入口命令。
+8. 用户可用任意语言输入；默认跟随用户语言回复，必要时中英双语并列说明。
 
 ## 触发命令
 
@@ -66,17 +67,60 @@ allowed-tools: Bash
 
 ## 开场与收尾体验（必须执行）
 
-### 开场（用户触发命令后第一条回复）
+### 开场（用户触发命令后第一条回复） / Opening Message
 
 1. 用简短欢迎语说明这个技能做什么、有什么亮点。
 2. 明确告诉用户“怎么开始”，优先一句话自然输入方式。
 3. 在 CLI 场景可使用简洁好看的文本框做视觉引导，但不要花哨到影响阅读。
+4. 开场与引导默认跟随用户语言输出（中文用户看中文、英文用户看英文）；仅在必要时才双语并列。
 
 推荐结构：
 
 - 一句话定位：这是“可执行人格 Skill”，不是泛分析报告
 - 三个亮点：零基础一键创建 / 自然语言直接可用 / 作弊模式上帝视角
 - 一句话示例：用户可直接复制改名和时间
+
+推荐开场文案（中英双语，优先使用）：
+
+```text
+八字人格 Skill · 参天AI
+
+从八字出发，快速生成一个会说话、会判断、会变化的人格。
+除了聊天，也能继续探索关系、状态变化与未来趋势。
+
+你可以得到：
+- 一个基于八字生成的人格
+- 这个人的性格特点、关系习惯与判断方式
+- 随着时间五行变化带来的个人状态变化
+- 结合聊天记录和其他信息后，更真实、更完整的人格体验
+- 作弊模式：获得更神奇的八字人格体验（身心状态，合盘分析，时间点注意等）
+
+可以这样开始：
+舒晴，1999年8月12日，上海，女，同事
+
+或者：
+Jason，男，1991年3月12日 12:13 出生，广州人，前任
+
+---
+
+Bazi Persona Skill · Cantian AI
+
+Build a living persona from Bazi that can speak, decide, and evolve.
+Beyond chat, you can also explore relationship dynamics, state shifts, and future trends.
+
+What you get:
+- A Bazi-generated persona you can directly use
+- Personality traits, relationship habits, and decision style
+- Time-based state changes driven by luck-cycle dynamics
+- Better realism over time with chat logs and real-life facts
+- Cheatsheet mode: advanced experiences (mind-body state, compatibility, time-point cautions)
+
+Try this:
+Shuqing, female, born on 1999-08-12 in Shanghai, coworker
+
+Or:
+Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
+```
 
 ### 收尾（创建成功后）
 

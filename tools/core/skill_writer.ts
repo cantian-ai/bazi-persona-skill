@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   buildChart,
@@ -165,6 +166,8 @@ interface CheatsheetSession {
   messages: CheatsheetSessionMessage[];
   updated_at: string;
 }
+
+type OutputLanguage = "zh" | "en";
 
 const INTERNAL_DATA_HEADING = "## Internal Data (System)";
 const RUNTIME_DIR_NAME = ".runtime";
@@ -738,25 +741,39 @@ function formatRelationList(items: string[], emptyHint: string): string {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-function interpretRelationEffects(items: string[]): string {
+function interpretRelationEffects(items: string[], lang: OutputLanguage = "zh"): string {
   if (items.length === 0) {
-    return "- 未检出强烈关系扰动，当前以稳定推进为主。";
+    return lang === "en"
+      ? "- No strong relation turbulence detected; keep a steady execution rhythm."
+      : "- 未检出强烈关系扰动，当前以稳定推进为主。";
   }
   const hasChong = items.some((x) => x.includes("冲"));
   const hasXing = items.some((x) => x.includes("刑"));
   const hasHe = items.some((x) => x.includes("合"));
   const effects: string[] = [];
   if (hasChong) {
-    effects.push("情绪与节奏易波动，建议先稳边界再决策。");
+    effects.push(
+      lang === "en"
+        ? "Emotion and rhythm may fluctuate; stabilize boundaries before key decisions."
+        : "情绪与节奏易波动，建议先稳边界再决策。",
+    );
   }
   if (hasXing) {
-    effects.push("关系摩擦敏感，沟通宜短句+明确责任。");
+    effects.push(
+      lang === "en"
+        ? "Relationship friction is sensitive; use short sentences and clear ownership."
+        : "关系摩擦敏感，沟通宜短句+明确责任。",
+    );
   }
   if (hasHe) {
-    effects.push("合作窗口增强，适合谈判、协同与资源整合。");
+    effects.push(
+      lang === "en"
+        ? "Collaboration windows are stronger; good for negotiation and resource alignment."
+        : "合作窗口增强，适合谈判、协同与资源整合。",
+    );
   }
   if (effects.length === 0) {
-    effects.push("关系影响中性，按既定节奏推进。");
+    effects.push(lang === "en" ? "Relation impact is neutral; continue the existing plan." : "关系影响中性，按既定节奏推进。");
   }
   return effects.map((x) => `- ${x}`).join("\n");
 }
@@ -798,7 +815,9 @@ async function buildFlowSnapshotMarkdown(params: {
   chart: ChartLike;
   meta: PersonaMeta;
   at?: string;
+  lang?: OutputLanguage;
 }): Promise<string> {
+  const lang = params.lang ?? "zh";
   const birthDate = normalizeDateInput(params.meta.birth.date);
   const birthTime = params.meta.birth.time ? normalizeTimeInput(params.meta.birth.time) : "12:00";
   const [birthYear, birthMonth, birthDay] = birthDate
@@ -925,6 +944,7 @@ async function buildFlowSnapshotMarkdown(params: {
     [decadeTenGod, yearLuckTenGod, yearTenGod, monthTenGod, dayTenGod, hourTenGod].filter(
       (item): item is string => Boolean(item),
     ),
+    lang,
   );
 
   const basePillars = [
@@ -950,9 +970,13 @@ async function buildFlowSnapshotMarkdown(params: {
   const flowRelationLines = Object.entries(flowRelations)
     .map(([label, items]) => {
       if (!items || items.length === 0) {
-        return `- ${label}：无明显刑冲合会`;
+        return lang === "en"
+          ? `- ${label}: no obvious relation impact`
+          : `- ${label}：无明显刑冲合会`;
       }
-      return `- ${label}：${items.slice(0, 4).join("；")}`;
+      return lang === "en"
+        ? `- ${label}: ${items.slice(0, 4).join("; ")}`
+        : `- ${label}：${items.slice(0, 4).join("；")}`;
     })
     .join("\n");
   const flowRelationFlat = Object.values(flowRelations).flat();
@@ -962,23 +986,43 @@ async function buildFlowSnapshotMarkdown(params: {
   const solarYear = solarMonth.getSolarYear();
 
   return [
-    `- 查询时间：${queryAt.display}`,
-    `- 阳历：${solarYear.getYear()}-${`${solarMonth.getMonth()}`.padStart(2, "0")}-${`${solarDay.getDay()}`.padStart(2, "0")} ${`${queryAt.hour}`.padStart(2, "0")}:${`${queryAt.minute}`.padStart(2, "0")}`,
-    `- 农历：${lunarYear.getName()} ${lunarMonth.getName()} ${lunarDay.getName()} ${lunarHour.getName()}`,
-    `- 当前大运：${currentDecade.getSixtyCycle().getName()}（${currentDecade.getStartAge()}-${currentDecade.getEndAge()}岁）${
-      decadeTenGod ? `，十神倾向：${decadeTenGod}` : ""
-    }`,
-    `- 当前流年：${currentFortune.getSixtyCycle().getName()}（年龄约 ${currentFortune.getAge()}）${
-      yearLuckTenGod ? `，十神倾向：${yearLuckTenGod}` : ""
-    }`,
-    `- 流月：${flowMonth}${monthTenGod ? `（${monthTenGod}）` : ""}`,
-    `- 流日：${flowDay}${dayTenGod ? `（${dayTenGod}）` : ""}`,
-    `- 流时：${flowHour}${hourTenGod ? `（${hourTenGod}）` : ""}`,
-    `- 今日能量解读：${energySummary}`,
-    `- 刑冲合会联动：`,
+    pickLangLine(lang, `- 查询时间：${queryAt.display}`, `- Query time: ${queryAt.display}`),
+    pickLangLine(
+      lang,
+      `- 阳历：${solarYear.getYear()}-${`${solarMonth.getMonth()}`.padStart(2, "0")}-${`${solarDay.getDay()}`.padStart(2, "0")} ${`${queryAt.hour}`.padStart(2, "0")}:${`${queryAt.minute}`.padStart(2, "0")}`,
+      `- Solar date: ${solarYear.getYear()}-${`${solarMonth.getMonth()}`.padStart(2, "0")}-${`${solarDay.getDay()}`.padStart(2, "0")} ${`${queryAt.hour}`.padStart(2, "0")}:${`${queryAt.minute}`.padStart(2, "0")}`,
+    ),
+    pickLangLine(
+      lang,
+      `- 农历：${lunarYear.getName()} ${lunarMonth.getName()} ${lunarDay.getName()} ${lunarHour.getName()}`,
+      `- Lunar date: ${lunarYear.getName()} ${lunarMonth.getName()} ${lunarDay.getName()} ${lunarHour.getName()}`,
+    ),
+    pickLangLine(
+      lang,
+      `- 当前大运：${currentDecade.getSixtyCycle().getName()}（${currentDecade.getStartAge()}-${currentDecade.getEndAge()}岁）${
+        decadeTenGod ? `，十神倾向：${decadeTenGod}` : ""
+      }`,
+      `- Current decade cycle: ${currentDecade.getSixtyCycle().getName()} (age ${currentDecade.getStartAge()}-${currentDecade.getEndAge()})${
+        decadeTenGod ? `, ten-god tilt: ${decadeTenGod}` : ""
+      }`,
+    ),
+    pickLangLine(
+      lang,
+      `- 当前流年：${currentFortune.getSixtyCycle().getName()}（年龄约 ${currentFortune.getAge()}）${
+        yearLuckTenGod ? `，十神倾向：${yearLuckTenGod}` : ""
+      }`,
+      `- Current yearly cycle: ${currentFortune.getSixtyCycle().getName()} (age around ${currentFortune.getAge()})${
+        yearLuckTenGod ? `, ten-god tilt: ${yearLuckTenGod}` : ""
+      }`,
+    ),
+    pickLangLine(lang, `- 流月：${flowMonth}${monthTenGod ? `（${monthTenGod}）` : ""}`, `- Month flow: ${flowMonth}${monthTenGod ? ` (${monthTenGod})` : ""}`),
+    pickLangLine(lang, `- 流日：${flowDay}${dayTenGod ? `（${dayTenGod}）` : ""}`, `- Day flow: ${flowDay}${dayTenGod ? ` (${dayTenGod})` : ""}`),
+    pickLangLine(lang, `- 流时：${flowHour}${hourTenGod ? `（${hourTenGod}）` : ""}`, `- Hour flow: ${flowHour}${hourTenGod ? ` (${hourTenGod})` : ""}`),
+    pickLangLine(lang, `- 今日能量解读：${energySummary}`, `- Energy readout: ${energySummary}`),
+    pickLangLine(lang, "- 刑冲合会联动：", "- Relation interactions:"),
     flowRelationLines,
-    `- 关系影响建议：`,
-    interpretRelationEffects(flowRelationFlat),
+    pickLangLine(lang, "- 关系影响建议：", "- Relation impact suggestions:"),
+    interpretRelationEffects(flowRelationFlat, lang),
   ].join("\n");
 }
 
@@ -1306,7 +1350,17 @@ function detectAccuracyMode(chart: unknown): PersonaMeta["accuracy_mode"] {
     : "full_chart";
 }
 
-function formatPreviewCard(card: PreviewCard): string {
+function formatPreviewCard(card: PreviewCard, lang: OutputLanguage = "zh"): string {
+  if (lang === "en") {
+    return [
+      "Persona Preview",
+      `1) One-line summary: ${card.summary}`,
+      `2) Speaking feel: ${card.speakingFeel}`,
+      `3) Decision priority: ${card.decisionFocus}`,
+      `4) Stress shift: ${card.stressShift}`,
+      `5) Current phase vibe: ${card.currentState}`,
+    ].join("\n");
+  }
   return [
     "人格预览",
     `1) 一句话人格总结：${card.summary}`,
@@ -1317,17 +1371,49 @@ function formatPreviewCard(card: PreviewCard): string {
   ].join("\n");
 }
 
-function formatCreateIntroCard(): string {
+function formatCreateIntroCard(lang: OutputLanguage = "zh"): string {
+  if (lang === "en") {
+    return [
+      "Bazi Persona Skill · Cantian AI",
+      "",
+      "Build a living persona from Bazi that can speak, decide, and adapt over time.",
+      "Beyond chat, you can also explore relationship dynamics, state shifts, and future trends.",
+      "",
+      "What you get:",
+      "",
+      "- Beginner friendly: create in one step from birth info",
+      "- Natural language first: just type naturally, no rigid command required",
+      "- Cheatsheet mode: ask status, relationship, and trend questions with a God-view",
+      "",
+      "Try this:",
+      "",
+      "Shuqing, female, born on 1999-08-12 in Shanghai, coworker",
+      "",
+      "Or:",
+      "",
+      "Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner",
+    ].join("\n");
+  }
+
   return [
-    "┌──────────────────────────────────────────────┐",
-    "│ Bazi Persona Skill                           │",
-    "│ 一键创建你的专属人格（零基础可用）            │",
-    "└──────────────────────────────────────────────┘",
-    "你可以直接说自然语言，不用记命令、不用按模板填表。",
-    "亮点1：零基础快速创建，输入出生信息就能用。",
-    "亮点2：支持“作弊模式”，可问状态、关系、未来趋势等上帝视角问题。",
-    "亮点3：越聊越像真人，后续可持续补充资料养成。",
-    "自然语言示例：帮我创建八字人格：小A，1996年8月12日下午3点半，上海，女，我和她是同事。",
+    "八字人格 Skill · 参天AI",
+    "",
+    "从八字出发，快速生成一个会说话、会判断、会变化的人格。",
+    "除了聊天，也能继续探索关系、状态变化与未来趋势。",
+    "",
+    "你可以得到：",
+    "",
+    "- 零基础可用：输入出生信息即可创建",
+    "- 自然语言可用：直接说人话，不用记命令",
+    "- 作弊模式：上帝视角看状态、关系、趋势",
+    "",
+    "可以这样开始：",
+    "",
+    "舒晴，1999年8月12日，上海，女，同事",
+    "",
+    "或者：",
+    "",
+    "Jason，男，1991年3月12日 12:13 出生，广州人，前任",
   ].join("\n");
 }
 
@@ -1335,7 +1421,16 @@ function buildAutoActivationLine(params: {
   name: string;
   preview: PreviewCard;
   relation?: string;
+  lang?: OutputLanguage;
 }): string {
+  const lang = params.lang ?? "zh";
+  if (lang === "en") {
+    const relationPrefix = params.relation
+      ? `From the "${params.relation}" perspective, `
+      : "";
+    const speakingFeel = params.preview.speakingFeel.replace(/[。！？!?]+$/u, "");
+    return `Quick take: ${relationPrefix}${speakingFeel}. Say your question directly and I'll answer in this persona with a clear next step.`;
+  }
   const relationPrefix = params.relation ? `站在“${params.relation}”这个关系里，` : "";
   const speakingFeel = params.preview.speakingFeel.replace(/[。！？!?]+$/u, "");
   return `先说重点：${relationPrefix}${speakingFeel}。你直接说问题，我会按这个人格给你结论和下一步。`;
@@ -1433,7 +1528,11 @@ function detectMemoryFactsFromText(content: string): string[] {
     .map((x) => x.trim())
     .filter(Boolean);
   return lines
-    .filter((line) => /曾|以前|小时候|毕业|工作|结婚|分手|创业|生病|住在|来自|喜欢|讨厌/.test(line))
+    .filter((line) =>
+      /曾|以前|小时候|毕业|工作|结婚|分手|创业|生病|住在|来自|喜欢|讨厌|used to|before|childhood|graduated|worked|married|broke up|startup|illness|live in|from|prefer|hate|like/i.test(
+        line,
+      ),
+    )
     .slice(0, 20);
 }
 
@@ -1932,6 +2031,60 @@ function normalizeCalendarType(value?: string): CalendarType {
   return value === "lunar" ? "lunar" : "solar";
 }
 
+function parsePreferredLanguage(value?: string): "auto" | "zh" | "en" {
+  if (!value) {
+    return "auto";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "zh" || normalized === "cn" || normalized === "中文" || normalized === "chinese") {
+    return "zh";
+  }
+  if (normalized === "en" || normalized === "english") {
+    return "en";
+  }
+  return "auto";
+}
+
+function hasCjk(text: string): boolean {
+  return /[\u3400-\u9fff]/u.test(text);
+}
+
+function detectLanguageFromText(text?: string): OutputLanguage | undefined {
+  if (!text) {
+    return undefined;
+  }
+  if (hasCjk(text)) {
+    return "zh";
+  }
+  if (/[A-Za-z]/.test(text)) {
+    return "en";
+  }
+  return undefined;
+}
+
+function resolveOutputLanguage(params: {
+  args?: Record<string, string>;
+  meta?: PersonaMeta;
+  message?: string;
+}): OutputLanguage {
+  const argLang = parsePreferredLanguage(params.args?.lang);
+  if (argLang === "zh" || argLang === "en") {
+    return argLang;
+  }
+  const messageLang = detectLanguageFromText(params.message);
+  if (messageLang) {
+    return messageLang;
+  }
+  if (params.meta?.preferred_language === "zh" || params.meta?.preferred_language === "en") {
+    return params.meta.preferred_language;
+  }
+  return "zh";
+}
+
+function pickLangLine(lang: OutputLanguage, zh: string, en: string): string {
+  return lang === "en" ? en : zh;
+}
+
 async function resolveChartForCreate(args: Record<string, string>): Promise<ChartLike> {
   const chartFromFile = readMaybeFile(args["chart-file"]);
   if (chartFromFile && chartFromFile.trim()) {
@@ -1966,14 +2119,23 @@ async function resolveChartForCreate(args: Record<string, string>): Promise<Char
   return built as unknown as ChartLike;
 }
 
-async function resolveRelation(args: Record<string, string>): Promise<string | undefined> {
+async function resolveRelation(
+  args: Record<string, string>,
+  lang: OutputLanguage,
+): Promise<string | undefined> {
   const direct = args.relation?.trim();
   if (direct) {
     return direct;
   }
   const input = await promptOptionalText({
-    hint: "关系补充（建议填写）：同事 / 老板 / 伴侣 / 朋友 / 家人 / 自己 / 名人 / 无关系",
-    prompt: "你和这个人的关系是？（回车可跳过）",
+    hint:
+      lang === "en"
+        ? "Relationship (recommended): coworker / boss / partner / friend / family / self / celebrity / none"
+        : "关系补充（建议填写）：同事 / 老板 / 伴侣 / 朋友 / 家人 / 自己 / 名人 / 无关系",
+    prompt:
+      lang === "en"
+        ? "What's your relationship with this person? (Enter to skip)"
+        : "你和这个人的关系是？（回车可跳过）",
   });
   return input?.trim();
 }
@@ -1990,7 +2152,8 @@ async function resolveRelationships(args: Record<string, string>): Promise<{
       activeRelationships: active.length > 0 ? active : fromArgs,
     };
   }
-  const relation = await resolveRelation(args);
+  const lang = resolveOutputLanguage({ args });
+  const relation = await resolveRelation(args, lang);
   const fallback = relation ? [relation] : ["未指定关系"];
   return {
     relationships: fallback,
@@ -2052,7 +2215,7 @@ function parseDateTimeInput(input?: string): {
   };
 }
 
-function buildFlowEnergySummary(tenGods: string[]): string {
+function buildFlowEnergySummary(tenGods: string[], lang: OutputLanguage = "zh"): string {
   const count = (targets: string[]) =>
     tenGods.filter((item) => targets.includes(item)).length;
   const guansha = count(["正官", "七杀"]);
@@ -2062,21 +2225,33 @@ function buildFlowEnergySummary(tenGods: string[]): string {
   const bijie = count(["比肩", "劫财"]);
 
   if (guansha >= 2) {
-    return "官杀能量偏强，今天更容易感到责任和压力，适合先定边界再推进。";
+    return lang === "en"
+      ? "Officer/Killer energy is strong; responsibility and pressure are higher today, so stabilize boundaries first."
+      : "官杀能量偏强，今天更容易感到责任和压力，适合先定边界再推进。";
   }
   if (shishang >= 2) {
-    return "食伤能量偏强，今天表达欲和输出欲更高，适合沟通、创作和公开表达。";
+    return lang === "en"
+      ? "Output-star energy is strong; expression and visibility are favored today."
+      : "食伤能量偏强，今天表达欲和输出欲更高，适合沟通、创作和公开表达。";
   }
   if (caixing >= 2) {
-    return "财星能量偏强，今天更务实，容易关注投入产出、资源与结果兑现。";
+    return lang === "en"
+      ? "Wealth-star energy is strong; today favors pragmatic ROI and resource execution."
+      : "财星能量偏强，今天更务实，容易关注投入产出、资源与结果兑现。";
   }
   if (yinxing >= 2) {
-    return "印星能量偏强，今天更倾向思考与复盘，适合补信息、做策略校准。";
+    return lang === "en"
+      ? "Resource-star energy is strong; better for reflection, information completion, and strategy calibration."
+      : "印星能量偏强，今天更倾向思考与复盘，适合补信息、做策略校准。";
   }
   if (bijie >= 2) {
-    return "比劫能量偏强，今天主观能动性更高，适合自己主导关键决策。";
+    return lang === "en"
+      ? "Peer-star energy is strong; initiative is high, suitable for self-led decisions."
+      : "比劫能量偏强，今天主观能动性更高，适合自己主导关键决策。";
   }
-  return "今日能量相对均衡，建议按既定节奏推进，避免情绪化加码。";
+  return lang === "en"
+    ? "Today's energy is relatively balanced; follow planned rhythm and avoid emotional over-commitment."
+    : "今日能量相对均衡，建议按既定节奏推进，避免情绪化加码。";
 }
 
 function sameDay(a: string, b: string): boolean {
@@ -2121,7 +2296,7 @@ function resolveStateRuntime(
 
 async function queryFlowStatus(args: Record<string, string>): Promise<void> {
   ensureRequired(args, ["slug"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   const slug = args.slug;
   const dir = personaDir(baseDir, slug);
   if (!fs.existsSync(dir)) {
@@ -2149,6 +2324,7 @@ async function queryFlowStatus(args: Record<string, string>): Promise<void> {
   if (!runtime) {
     throw new Error("当前人格缺少运行数据，暂时无法查询流年流月流日流时。");
   }
+  const uiLang = resolveOutputLanguage({ args, meta: runtime.meta });
   const runtimeMode = resolveStateRuntime(runtime.state.runtime, args);
   const now = nowIso();
   const effectiveAt =
@@ -2163,6 +2339,7 @@ async function queryFlowStatus(args: Record<string, string>): Promise<void> {
     chart: runtime.evidence.chart,
     meta: runtime.meta,
     at: effectiveAt,
+    lang: uiLang,
   });
   if (shouldRefresh || args["state-mode"] || args["resume-auto"]) {
     runtime.state.runtime = {
@@ -2189,8 +2366,12 @@ async function queryFlowStatus(args: Record<string, string>): Promise<void> {
   }
   process.stdout.write(
     [
-      `时运查询（${runtime.meta.name}）`,
-      `状态模式：${runtime.state.runtime?.mode ?? "auto"}${runtime.state.runtime?.locked_at ? `（锁定：${runtime.state.runtime.locked_at}）` : ""}`,
+      pickLangLine(uiLang, `时运查询（${runtime.meta.name}）`, `Flow Snapshot (${runtime.meta.name})`),
+      pickLangLine(
+        uiLang,
+        `状态模式：${runtime.state.runtime?.mode ?? "auto"}${runtime.state.runtime?.locked_at ? `（锁定：${runtime.state.runtime.locked_at}）` : ""}`,
+        `State mode: ${runtime.state.runtime?.mode ?? "auto"}${runtime.state.runtime?.locked_at ? ` (locked at: ${runtime.state.runtime.locked_at})` : ""}`,
+      ),
       flowSnapshot,
     ].join("\n") + "\n",
   );
@@ -2252,6 +2433,7 @@ user-invocable: true
 ${params.name} 的人格由长期结构与近期状态共同驱动。先按人格规则决定表达和判断，再完成任务。
 - 当前生效关系：${relationshipLabel}
 - 状态模式：${params.stateRuntime?.mode ?? "auto"}${params.stateRuntime?.locked_at ? `（锁定时点：${params.stateRuntime.locked_at}）` : ""}
+- 语言偏好 / Language Preference：${params.meta.preferred_language ?? "auto"}
 
 ## Persona Rules
 
@@ -2292,6 +2474,13 @@ ${memoryText}
 
 ${memoryPinText}
 
+## Language Policy / 语言策略
+
+- 默认按用户当前输入语言回复（中文/English/其他语种均可）。
+- If the user switches language, keep persona style but switch language immediately.
+- 若用户明确指定语言（如“请用英文”），优先按指定语言回复。
+- Mixed-language input: follow the dominant language and keep key terms bilingual when useful.
+
 ## Memory Protocol
 
 - 只要用户提到明确事实或过往经历，必须记录为记忆（优先记为 behavior_fact）。
@@ -2308,11 +2497,20 @@ ${memoryPinText}
 5. 不向用户暴露内部脚本、文件路径、命令或工具调用细节。
 6. 识别到具体事实或过往经历时，立即写入记忆并在后续对话中体现。
 7. 进入 cheatsheet 模式时，才输出深度命理分析与好感度评分。
+8. 在任何模式下，优先按用户当前语言回复并保持人格一致。
 `;
 }
 
 function personaDir(baseDir: string, slug: string): string {
   return path.join(baseDir, slug);
+}
+
+function resolveBaseDir(args: Record<string, string>): string {
+  return (
+    args["base-dir"] ??
+    process.env.BAZI_PERSONA_HOME ??
+    path.join(os.homedir(), ".bazi-personas")
+  );
 }
 
 function buildIndex(baseDir: string): PersonaIndexItem[] {
@@ -2369,9 +2567,10 @@ async function createPersona(args: Record<string, string>): Promise<void> {
     args["birth-location"] = args["birth-place"];
   }
   ensureRequired(args, ["name", "gender", "birth-date", "birth-location"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   ensureDir(baseDir);
-  process.stdout.write(`${formatCreateIntroCard()}\n\n`);
+  const uiLang = resolveOutputLanguage({ args });
+  process.stdout.write(`${formatCreateIntroCard(uiLang)}\n\n`);
 
   const name = args.name.trim();
   const slug = args.slug ? toSlug(args.slug) : toSlug(name);
@@ -2404,7 +2603,7 @@ async function createPersona(args: Record<string, string>): Promise<void> {
     stressShift: args["preview-stress"] ?? generatedPack.preview.stressShift,
     currentState: args["preview-current"] ?? generatedPack.preview.currentState,
   };
-  process.stdout.write(`${formatPreviewCard(preview)}\n`);
+  process.stdout.write(`${formatPreviewCard(preview, uiLang)}\n`);
   const confirmed = await askWriteConfirmation(
     args,
     "即将写入人格目录",
@@ -2426,6 +2625,7 @@ async function createPersona(args: Record<string, string>): Promise<void> {
     slug,
     gender: normalizeGender(args.gender),
     relation: relationshipSetup.relationships[0],
+    preferredLanguage: parsePreferredLanguage(args.lang),
     relationships: relationshipSetup.relationships,
     activeRelationships: relationshipSetup.activeRelationships,
     birth: {
@@ -2441,6 +2641,7 @@ async function createPersona(args: Record<string, string>): Promise<void> {
   const flowSnapshot = await buildFlowSnapshotMarkdown({
     chart,
     meta,
+    lang: uiLang,
   });
   const runtimeBundle: RuntimeBundle = {
     core: {
@@ -2490,23 +2691,53 @@ async function createPersona(args: Record<string, string>): Promise<void> {
 
   process.stdout.write(
     [
-      "创建成功。",
-      `目录：${dir}`,
-      `触发词：/${slug}`,
-      "别名提示：/create-bazi-persona（主命令） /create-bazi（友好别名）",
-      `已自动切换到角色模式：${name}`,
-      `角色开场：${buildAutoActivationLine({ name, preview, relation: relationshipSetup.activeRelationships.join(" / ") })}`,
-      "你也可以直接自然语言继续聊，不需要再记任何命令。",
-      "想用上帝视角：直接说“打开作弊模式”，就能问状态、合盘、经历和趋势。",
-      "增强建议：1) 导入聊天片段 2) 补充现实经历 3) 添加公开链接资料",
-      "你下一句直接说需求即可，我会持续按该人格回应。",
+      pickLangLine(uiLang, "创建成功。", "Created successfully."),
+      pickLangLine(uiLang, `目录：${dir}`, `Directory: ${dir}`),
+      pickLangLine(uiLang, `触发词：/${slug}`, `Trigger: /${slug}`),
+      pickLangLine(
+        uiLang,
+        "别名提示：/create-bazi-persona（主命令） /create-bazi（友好别名）",
+        "Command aliases: /create-bazi-persona (primary) /create-bazi (friendly)",
+      ),
+      pickLangLine(uiLang, `已自动切换到角色模式：${name}`, `Auto-switched to persona mode: ${name}`),
+      pickLangLine(
+        uiLang,
+        `角色开场：${buildAutoActivationLine({
+          name,
+          preview,
+          relation: relationshipSetup.activeRelationships.join(" / "),
+          lang: uiLang,
+        })}`,
+        `Opening line: ${buildAutoActivationLine({
+          name,
+          preview,
+          relation: relationshipSetup.activeRelationships.join(" / "),
+          lang: uiLang,
+        })}`,
+      ),
+      pickLangLine(
+        uiLang,
+        "你也可以直接自然语言继续聊，不需要再记任何命令。",
+        "You can continue in natural language now, no extra command needed.",
+      ),
+      pickLangLine(
+        uiLang,
+        "想用上帝视角：直接说“打开作弊模式”，就能问状态、合盘、经历和趋势。",
+        'Want God-view insights? Say: "Open cheatsheet mode".',
+      ),
+      pickLangLine(
+        uiLang,
+        "增强建议：1) 导入聊天片段 2) 补充现实经历 3) 添加公开链接资料",
+        "Boost fit quickly: 1) add chat snippets 2) add real-life facts 3) add public links",
+      ),
+      pickLangLine(uiLang, "你下一句直接说需求即可，我会持续按该人格回应。", "Send your next message naturally and I'll stay in persona."),
     ].join("\n") + "\n",
   );
 }
 
 async function updatePersona(args: Record<string, string>): Promise<void> {
   ensureRequired(args, ["slug"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   const slug = args.slug;
   const dir = personaDir(baseDir, slug);
   if (!fs.existsSync(dir)) {
@@ -2563,6 +2794,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"],
   );
   const runtimeMode = resolveStateRuntime(runtime.state.runtime, args);
+  const uiLang = resolveOutputLanguage({ args, meta: runtime.meta });
 
   if (!personaPatch && !statePatch && !correction && !memoryInput && !incomingChart && !chatText && !textMaterial && urls.length === 0 && !args["memory-pin"] && !args["memory-unpin"] && !args["memory-forget"]) {
     throw new Error(
@@ -2580,7 +2812,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     stressShift: args["preview-stress"] ?? inferredPreview.stressShift,
     currentState: args["preview-current"] ?? inferredPreview.currentState,
   };
-  process.stdout.write(`${formatPreviewCard(preview)}\n`);
+  process.stdout.write(`${formatPreviewCard(preview, uiLang)}\n`);
   const confirmed = await askWriteConfirmation(
     args,
     "即将更新当前人格",
@@ -2704,6 +2936,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     relationships: relationshipSet.relationships,
     activeRelationships: relationshipSet.activeRelationships,
     appendLedger,
+    preferredLanguage: args.lang ? parsePreferredLanguage(args.lang) : undefined,
   });
 
   const nextRuntime: RuntimeBundle = {
@@ -2742,6 +2975,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
   const nextFlowSnapshot = await buildFlowSnapshotMarkdown({
     chart: currentChart,
     meta: nextMeta,
+    lang: uiLang,
   });
   writeUtf8(
     skillPath,
@@ -2775,30 +3009,33 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
 
   process.stdout.write(
     [
-      "更新成功。",
-      `已备份版本：${backupName}`,
-      `当前版本：${nextMeta.version}`,
+      pickLangLine(uiLang, "更新成功。", "Updated successfully."),
+      pickLangLine(uiLang, `已备份版本：${backupName}`, `Backup snapshot: ${backupName}`),
+      pickLangLine(uiLang, `当前版本：${nextMeta.version}`, `Current version: ${nextMeta.version}`),
     ].join("\n") + "\n",
   );
 }
 
 function listPersonas(args: Record<string, string>): void {
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
+  const uiLang = resolveOutputLanguage({ args });
   const rows = buildIndex(baseDir);
   if (rows.length === 0) {
-    process.stdout.write("暂无已创建的人格。\n");
+    process.stdout.write(`${pickLangLine(uiLang, "暂无已创建的人格。", "No personas found yet.")}\n`);
     return;
   }
-  process.stdout.write(`共 ${rows.length} 个八字人格：\n\n`);
+  process.stdout.write(
+    `${pickLangLine(uiLang, `共 ${rows.length} 个八字人格：`, `${rows.length} personas found:`)}\n\n`,
+  );
   for (const row of rows) {
     process.stdout.write(
       [
         `- slug: ${row.slug}`,
-        `  名称: ${row.name}`,
-        `  版本: ${row.version}`,
-        `  创建: ${row.created_at}`,
-        `  更新: ${row.updated_at}`,
-        `  资料来源数: ${row.source_count}`,
+        `  ${pickLangLine(uiLang, "名称", "Name")}: ${row.name}`,
+        `  ${pickLangLine(uiLang, "版本", "Version")}: ${row.version}`,
+        `  ${pickLangLine(uiLang, "创建", "Created")}: ${row.created_at}`,
+        `  ${pickLangLine(uiLang, "更新", "Updated")}: ${row.updated_at}`,
+        `  ${pickLangLine(uiLang, "资料来源数", "Source count")}: ${row.source_count}`,
       ].join("\n") + "\n\n",
     );
   }
@@ -2807,7 +3044,7 @@ function listPersonas(args: Record<string, string>): void {
 function deletePersona(args: Record<string, string>): void {
   ensureRequired(args, ["slug", "confirm-1", "confirm-2"]);
   const slug = args.slug;
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   const dir = personaDir(baseDir, slug);
   if (!fs.existsSync(dir)) {
     throw new Error(
@@ -2834,19 +3071,23 @@ function deletePersona(args: Record<string, string>): void {
     );
   }
   fs.rmSync(dir, { recursive: true, force: false });
-  process.stdout.write(`已删除人格目录：${dir}\n`);
+  const uiLang = resolveOutputLanguage({ args });
+  process.stdout.write(
+    `${pickLangLine(uiLang, `已删除人格目录：${dir}`, `Deleted persona directory: ${dir}`)}\n`,
+  );
 }
 
 function rollbackByVersion(args: Record<string, string>): void {
   ensureRequired(args, ["slug", "version"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   const slug = args.slug;
   const version = args.version;
   const snapshot = rollbackPersona(baseDir, slug, version);
+  const uiLang = resolveOutputLanguage({ args });
   process.stdout.write(
     [
-      `回滚成功，已恢复版本 ${version}。`,
-      `回滚前快照：${snapshot}`,
+      pickLangLine(uiLang, `回滚成功，已恢复版本 ${version}。`, `Rollback complete. Restored version ${version}.`),
+      pickLangLine(uiLang, `回滚前快照：${snapshot}`, `Pre-rollback snapshot: ${snapshot}`),
     ].join("\n") + "\n",
   );
 }
@@ -2886,11 +3127,17 @@ async function ingestPersona(args: Record<string, string>): Promise<void> {
 
 function computeAffinityScore(message: string, runtime: RuntimeBundle): { score: number; reason: string } {
   if (!message.trim()) {
-    return { score: 50, reason: "未提供消息内容，使用中性评分。" };
+    return { score: 50, reason: "Neutral input; no message content detected." };
   }
-  const positive = /(谢谢|辛苦|支持|理解|靠谱|信任|喜欢|合作|清楚|尊重)/.test(message);
-  const negative = /(你错了|废话|随便|无所谓|赶紧|别问|都行|闭嘴|烦)/.test(message);
-  const boundary = /(边界|目标|责任|截止|交付|复盘)/.test(message);
+  const positive = /(谢谢|辛苦|支持|理解|靠谱|信任|喜欢|合作|清楚|尊重|thanks|appreciate|support|understand|trust|respect|clear|collaborate)/i.test(
+    message,
+  );
+  const negative = /(你错了|废话|随便|无所谓|赶紧|别问|都行|闭嘴|烦|shut up|whatever|nonsense|hurry up|don't ask|annoying|you are wrong)/i.test(
+    message,
+  );
+  const boundary = /(边界|目标|责任|截止|交付|复盘|boundary|goal|responsibility|deadline|deliver|review)/i.test(
+    message,
+  );
   let score = 55;
   if (positive) score += 20;
   if (boundary) score += 15;
@@ -2900,10 +3147,10 @@ function computeAffinityScore(message: string, runtime: RuntimeBundle): { score:
   return {
     score,
     reason: boundary
-      ? "命中边界/目标型表达，符合该人格偏好。"
+      ? "Boundary/goal language matched this persona preference."
       : negative
-        ? "出现冲突性措辞，触发低好感区。"
-        : "整体中性，建议增加明确目标与尊重语气。",
+        ? "Conflict-heavy wording triggered a lower affinity response."
+        : "Mostly neutral; clearer goals and respectful tone can improve affinity.",
   };
 }
 
@@ -2961,16 +3208,16 @@ function classifyCheatsheetIntent(message: string): CheatsheetIntent {
   if (!text) {
     return "chat";
   }
-  if (/(今天|现在|此刻|状态|时运|流年|流月|流日|流时|开心|压力)/.test(text)) {
+  if (/(今天|现在|此刻|状态|时运|流年|流月|流日|流时|开心|压力|today|now|status|flow|year luck|month luck|day luck|hour luck|mood|pressure|happy)/i.test(text)) {
     return "status";
   }
-  if (/(合盘|相处|关系|我和|跟.*合不合)/.test(text)) {
+  if (/(合盘|相处|关系|我和|跟.*合不合|compat|match|relationship|get along|between us)/i.test(text)) {
     return "compat";
   }
-  if (/(成长|经历|家庭|学历|背景|过去|童年|工作经历)/.test(text)) {
+  if (/(成长|经历|家庭|学历|背景|过去|童年|工作经历|upbringing|background|past|childhood|education|career history|experience)/i.test(text)) {
     return "growth";
   }
-  if (/(未来|运势|预测|婚恋|事业|财富|明年|后年|关键年份)/.test(text)) {
+  if (/(未来|运势|预测|婚恋|事业|财富|明年|后年|关键年份|future|forecast|trend|next year|career|wealth|relationship|marriage)/i.test(text)) {
     return "future";
   }
   return "chat";
@@ -2985,13 +3232,13 @@ function parseCheatsheetControlFromMessage(message: string): "on" | "off" | "sta
   if (!text) {
     return undefined;
   }
-  if (/(打开|开启|进入|启动).*(作弊模式|cheatsheet|上帝模式)/.test(text)) {
+  if (/(打开|开启|进入|启动).*(作弊模式|cheatsheet|上帝模式)|(open|turn on|enable).*(cheatsheet|cheat mode|god mode)/i.test(text)) {
     return "on";
   }
-  if (/(关闭|退出|停止).*(作弊模式|cheatsheet|上帝模式)/.test(text)) {
+  if (/(关闭|退出|停止).*(作弊模式|cheatsheet|上帝模式)|(close|turn off|disable|exit).*(cheatsheet|cheat mode|god mode)/i.test(text)) {
     return "off";
   }
-  if (/(作弊模式|cheatsheet|上帝模式).*(状态|开着|开启了吗|是否开启)/.test(text)) {
+  if (/(作弊模式|cheatsheet|上帝模式).*(状态|开着|开启了吗|是否开启)|(cheatsheet|cheat mode|god mode).*(status|on|enabled)/i.test(text)) {
     return "status";
   }
   return undefined;
@@ -2999,9 +3246,10 @@ function parseCheatsheetControlFromMessage(message: string): "on" | "off" | "sta
 
 async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
   ensureRequired(args, ["slug"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const baseDir = resolveBaseDir(args);
   const { dir, runtime } = loadRuntimeOrThrow(baseDir, args.slug);
   const userMessage = args.message ?? "";
+  const uiLang = resolveOutputLanguage({ args, meta: runtime.meta, message: userMessage });
   const naturalMode = parseCheatsheetControlFromMessage(userMessage);
   const mode = ((args.mode ?? "").toLowerCase() || naturalMode || "");
   const now = nowIso();
@@ -3029,9 +3277,21 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     saveRuntimeBundleToDisk(dir, runtime);
     process.stdout.write(
       [
-        `Cheatsheet 模式：${runtime.state.runtime.cheatsheet.enabled ? "已开启" : "已关闭"}`,
-        `满意度指示：${runtime.state.runtime.cheatsheet.affinity ? "开启" : "关闭"}`,
-        "开启后可正常聊天，也可随时问状态/合盘/经历/未来问题。",
+        pickLangLine(
+          uiLang,
+          `Cheatsheet 模式：${runtime.state.runtime.cheatsheet.enabled ? "已开启" : "已关闭"}`,
+          `Cheatsheet mode: ${runtime.state.runtime.cheatsheet.enabled ? "ON" : "OFF"}`,
+        ),
+        pickLangLine(
+          uiLang,
+          `满意度指示：${runtime.state.runtime.cheatsheet.affinity ? "开启" : "关闭"}`,
+          `Affinity indicator: ${runtime.state.runtime.cheatsheet.affinity ? "ON" : "OFF"}`,
+        ),
+        pickLangLine(
+          uiLang,
+          "开启后可正常聊天，也可随时问状态/合盘/经历/未来问题。",
+          "You can chat normally, and ask status/compat/growth/future questions anytime.",
+        ),
       ].join("\n") + "\n",
     );
     return;
@@ -3041,8 +3301,12 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
   if (!runtimeCheatsheet.enabled && args.force !== "true") {
     process.stdout.write(
       [
-        "Cheatsheet 模式当前未开启。",
-        "先执行：--action cheatsheet --slug <slug> --mode on",
+        pickLangLine(uiLang, "Cheatsheet 模式当前未开启。", "Cheatsheet mode is currently OFF."),
+        pickLangLine(
+          uiLang,
+          "先执行：--action cheatsheet --slug <slug> --mode on",
+          "Run first: --action cheatsheet --slug <slug> --mode on",
+        ),
       ].join("\n") + "\n",
     );
     return;
@@ -3088,6 +3352,7 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     chart: runtime.evidence.chart,
     meta: runtime.meta,
     at,
+    lang: uiLang,
   });
   const element = inferElementFromDayMaster(runtime.evidence.chart.day_master);
   const relations = (runtime.meta.active_relationships ?? runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"])
@@ -3102,7 +3367,58 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
   const keyYears = buildKeyYearWindows();
   const tracks = buildCheatsheetTalkTracks();
   let body: string[] = [];
-  if (intent === "status") {
+  if (uiLang === "en" && intent === "status") {
+    body = [
+      "Card | Status",
+      "- Takeaway: stabilize boundaries first, then push one key action.",
+      flowSnapshot,
+      "- Suggestion: prioritize one deliverable action today and reduce context switching.",
+      `- Confidence: ${confidence.score}/100`,
+      ...(recentContext ? [`- Recent cheatsheet context: ${recentContext}`] : []),
+    ];
+  } else if (uiLang === "en" && intent === "compat") {
+    body = [
+      "Card | Compatibility",
+      `- Active relationship lens: ${relations}`,
+      "- Takeaway: align on goal, then boundaries, then action list.",
+      "- Avoid: changing terms repeatedly, vague ownership, and no deadline.",
+      "- Advanced: for full compatibility run --action compat --slug-a A --slug-b B.",
+      "- Suggested line: 'Let's align goals and ownership first, then discuss execution.'",
+      ...(recentContext ? [`- Recent cheatsheet context: ${recentContext}`] : []),
+    ];
+  } else if (uiLang === "en" && intent === "growth") {
+    body = [
+      "Card | Growth Insight",
+      `- Growth script: ${element}-element day master often matures through boundary and growth challenges.`,
+      "- Career arc: tends to build capability in high-standard, high-ownership environments.",
+      "- Improve fit: add 3 real episodes (trigger-response-outcome).",
+      `- Confidence: ${confidence.score}/100`,
+      ...(recentContext ? [`- Recent cheatsheet context: ${recentContext}`] : []),
+    ];
+  } else if (uiLang === "en" && intent === "future") {
+    body = [
+      "Card | Future Insight",
+      "- Relationship: prioritize response consistency and boundary alignment.",
+      "- Career: take key responsibilities in resonance years; stabilize rhythm in clash-heavy years.",
+      "- Wealth: favor discipline and drawdown control over emotional expansion.",
+      "- Key windows:",
+      ...keyYears.map((x) => `  - ${x}`),
+      ...(recentContext ? [`- Recent cheatsheet context: ${recentContext}`] : []),
+    ];
+  } else if (uiLang === "en") {
+    const voice =
+      extractSectionFirstBullet(runtime.core.persona_markdown, "对话风格（像真人）") ??
+      "Lead with the point, then the action";
+    body = [
+      "Card | Normal Chat (Cheatsheet ON)",
+      `- Reply style: ${voice}`,
+      "- Keep chatting naturally; I'll switch templates only when intent matches status/compat/growth/future.",
+      `- Better framing: ${userMessage ? `"${userMessage}" -> state goal first, then boundary.` : "state goal first, then boundary."}`,
+      "- Suggested lines:",
+      ...tracks.map((x) => `  - ${x}`),
+      ...(recentContext ? [`- Recent cheatsheet context: ${recentContext}`] : []),
+    ];
+  } else if (intent === "status") {
     body = [
       "Card｜状态问答",
       "- 结论：当前更适合“先稳边界，再推进关键动作”。",
@@ -3164,21 +3480,26 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
   saveRuntimeBundleToDisk(dir, runtime);
   process.stdout.write(
     [
-      `Cheatsheet（${runtime.meta.name}）`,
+      pickLangLine(uiLang, `Cheatsheet（${runtime.meta.name}）`, `Cheatsheet (${runtime.meta.name})`),
       "",
       ...body,
       affinity
-        ? `- 消息好感度：${affinity.score}/100（${affinity.reason}）`
-        : "- 消息好感度：已关闭",
+        ? pickLangLine(uiLang, `- 消息好感度：${affinity.score}/100（${affinity.reason}）`, `- Message affinity: ${affinity.score}/100 (${affinity.reason})`)
+        : pickLangLine(uiLang, "- 消息好感度：已关闭", "- Message affinity: OFF"),
       "",
-      "说明：Cheatsheet 开启后可正常聊天，只有命中特定问题才切对应模板。",
+      pickLangLine(
+        uiLang,
+        "说明：Cheatsheet 开启后可正常聊天，只有命中特定问题才切对应模板。",
+        "Note: Cheatsheet mode keeps normal chat; it only switches templates for matched intents.",
+      ),
     ].join("\n") + "\n",
   );
 }
 
 async function compatPersona(args: Record<string, string>): Promise<void> {
   ensureRequired(args, ["slug-a", "slug-b"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const uiLang = resolveOutputLanguage({ args });
+  const baseDir = resolveBaseDir(args);
   const a = loadRuntimeOrThrow(baseDir, args["slug-a"]).runtime;
   const b = loadRuntimeOrThrow(baseDir, args["slug-b"]).runtime;
   const aElement = inferElementFromDayMaster(a.evidence.chart.day_master);
@@ -3191,20 +3512,21 @@ async function compatPersona(args: Record<string, string>): Promise<void> {
     (aElement === "水" && bElement === "金");
   process.stdout.write(
     [
-      `合盘分析：${a.meta.name} × ${b.meta.name}`,
-      `- 五行主轴：${aElement} × ${bElement}`,
-      `- 配合倾向：${complement ? "互补性较强" : "同频/磨合并存"}`,
-      "- 高概率冲突点：节奏不同、边界定义不同、情绪表达不同。",
-      "- 最优相处策略：先对齐目标，再约定边界，再同步反馈节奏。",
-      "- 快速破局话术：'我们先统一目标和责任，再讨论执行路径。'",
-      "- 建议：若要分析“你与TA”，请先创建你自己的 persona 再做合盘。",
+      pickLangLine(uiLang, `合盘分析：${a.meta.name} × ${b.meta.name}`, `Compatibility: ${a.meta.name} × ${b.meta.name}`),
+      pickLangLine(uiLang, `- 五行主轴：${aElement} × ${bElement}`, `- Element axis: ${aElement} × ${bElement}`),
+      pickLangLine(uiLang, `- 配合倾向：${complement ? "互补性较强" : "同频/磨合并存"}`, `- Fit tendency: ${complement ? "more complementary" : "same-frequency with friction"}`),
+      pickLangLine(uiLang, "- 高概率冲突点：节奏不同、边界定义不同、情绪表达不同。", "- Likely friction points: rhythm mismatch, boundary mismatch, emotional expression mismatch."),
+      pickLangLine(uiLang, "- 最优相处策略：先对齐目标，再约定边界，再同步反馈节奏。", "- Best strategy: align goals first, set boundaries, then sync feedback rhythm."),
+      pickLangLine(uiLang, "- 快速破局话术：'我们先统一目标和责任，再讨论执行路径。'", "- Quick reset line: 'Let's align goals and ownership first, then discuss execution.'"),
+      pickLangLine(uiLang, "- 建议：若要分析“你与TA”，请先创建你自己的 persona 再做合盘。", "- Tip: to analyze you + this persona, create your own persona first, then run compatibility."),
     ].join("\n") + "\n",
   );
 }
 
 function memoryOps(args: Record<string, string>): void {
   ensureRequired(args, ["slug"]);
-  const baseDir = args["base-dir"] ?? "./personas";
+  const uiLang = resolveOutputLanguage({ args });
+  const baseDir = resolveBaseDir(args);
   const { dir, runtime } = loadRuntimeOrThrow(baseDir, args.slug);
   const op = (args.op ?? "list").toLowerCase();
   const scope = (args.scope ?? "normal").toLowerCase();
@@ -3216,7 +3538,14 @@ function memoryOps(args: Record<string, string>): void {
       .reverse()
       .map((x) => `- ${x.id} [${x.type}/${x.weight}] ${x.content}`);
     process.stdout.write(
-      [`记忆列表（${runtime.meta.name} / ${useCheatsheetScope ? "cheatsheet" : "normal"}）`, ...(rows.length > 0 ? rows : ["- 暂无记忆"])].join("\n") + "\n",
+      [
+        pickLangLine(
+          uiLang,
+          `记忆列表（${runtime.meta.name} / ${useCheatsheetScope ? "cheatsheet" : "normal"}）`,
+          `Memory list (${runtime.meta.name} / ${useCheatsheetScope ? "cheatsheet" : "normal"})`,
+        ),
+        ...(rows.length > 0 ? rows : [pickLangLine(uiLang, "- 暂无记忆", "- No memory yet")]),
+      ].join("\n") + "\n",
     );
     return;
   }
@@ -3259,7 +3588,9 @@ function memoryOps(args: Record<string, string>): void {
     runtime.meta.active_relationships ?? runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"],
   );
   saveRuntimeBundleToDisk(dir, runtime);
-  process.stdout.write(`memory 操作完成：${op}\n`);
+  process.stdout.write(
+    `${pickLangLine(uiLang, `memory 操作完成：${op}`, `Memory operation completed: ${op}`)}\n`,
+  );
 }
 
 async function main(): Promise<void> {

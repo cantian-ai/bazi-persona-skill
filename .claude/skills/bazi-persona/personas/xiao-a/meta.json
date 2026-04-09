@@ -1,0 +1,24 @@
+{
+  "name": "小A",
+  "slug": "xiao-a",
+  "gender": "女",
+  "created_at": "2026-04-09T08:39:38.006Z",
+  "updated_at": "2026-04-09T08:39:38.006Z",
+  "version": "v1",
+  "birth": {
+    "date": "1992-03-29",
+    "time": "12:00",
+    "location": "上海",
+    "calendar_type": "solar"
+  },
+  "source_stats": {
+    "chat_count": 0,
+    "text_count": 0,
+    "correction_count": 0
+  },
+  "corrections_count": 0,
+  "command_history": [
+    "/create-bazi-persona"
+  ],
+  "accuracy_mode": "full_chart"
+}

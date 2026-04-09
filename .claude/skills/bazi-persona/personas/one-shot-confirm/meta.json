@@ -1,0 +1,24 @@
+{
+  "name": "单命令确认测试",
+  "slug": "one-shot-confirm",
+  "gender": "男",
+  "created_at": "2026-04-09T09:47:44.023Z",
+  "updated_at": "2026-04-09T09:47:44.023Z",
+  "version": "v1",
+  "birth": {
+    "date": "1992-06-18",
+    "time": "09:00",
+    "location": "北京",
+    "calendar_type": "solar"
+  },
+  "source_stats": {
+    "chat_count": 0,
+    "text_count": 0,
+    "correction_count": 0
+  },
+  "corrections_count": 0,
+  "command_history": [
+    "/create-bazi-persona"
+  ],
+  "accuracy_mode": "full_chart"
+}

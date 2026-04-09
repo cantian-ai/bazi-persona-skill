@@ -1,0 +1,43 @@
+{
+  "name": "bazi-persona-skill",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "bazi": "node dist/core/skill_writer.js",
+    "bazi:init": "node dist/core/skill_writer.js --action create",
+    "bazi:update": "node dist/core/skill_writer.js --action update",
+    "bazi:list": "node dist/core/skill_writer.js --action list",
+    "bazi:flow": "node dist/core/skill_writer.js --action flow",
+    "bazi:ingest": "node dist/core/skill_writer.js --action ingest",
+    "bazi:cheatsheet": "node dist/core/skill_writer.js --action cheatsheet",
+    "bazi:compat": "node dist/core/skill_writer.js --action compat",
+    "bazi:memory": "node dist/core/skill_writer.js --action memory",
+    "bazi:delete": "node dist/core/skill_writer.js --action delete",
+    "bazi:rollback": "node dist/core/skill_writer.js --action rollback",
+    "create:persona": "tsx tools/core/skill_writer.ts --action create",
+    "update:persona": "tsx tools/core/skill_writer.ts --action update",
+    "list:persona": "tsx tools/core/skill_writer.ts --action list",
+    "rollback:persona": "tsx tools/runtime/version_manager.ts --action rollback",
+    "calc:bazi": "tsx tools/core/bazi_calc.ts",
+    "skills:list": "npx skills add . --list",
+    "install:codex": "npx skills add . --skill bazi-persona -a codex --copy -y",
+    "install:global:codex": "npx skills add . --skill bazi-persona -a codex -g --copy -y",
+    "install:all": "npx skills add . --skill bazi-persona -a codex -a claude-code -a cursor --copy -y",
+    "link:target": "bash -lc 'test -n \"$TARGET\" || { echo \"Usage: TARGET=/abs/path/to/project npm run link:target\"; exit 1; }; mkdir -p \"$TARGET/.agents/skills\"; ln -sfn \"$PWD\" \"$TARGET/.agents/skills/bazi-persona\"; echo \"linked -> $TARGET/.agents/skills/bazi-persona\"'",
+    "unlink:target": "bash -lc 'test -n \"$TARGET\" || { echo \"Usage: TARGET=/abs/path/to/project npm run unlink:target\"; exit 1; }; rm -rf \"$TARGET/.agents/skills/bazi-persona\"; echo \"removed -> $TARGET/.agents/skills/bazi-persona\"'"
+  },
+  "dependencies": {
+    "cantian-tymext": "^0.0.26",
+    "pinyin-pro": "^3.26.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  }
+}

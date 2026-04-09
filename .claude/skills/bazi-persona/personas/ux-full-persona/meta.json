@@ -1,0 +1,25 @@
+{
+  "name": "体验优化全测-完整",
+  "slug": "ux-full-persona",
+  "gender": "男",
+  "created_at": "2026-04-09T08:56:13.642Z",
+  "updated_at": "2026-04-09T08:58:03.190Z",
+  "version": "v1",
+  "birth": {
+    "date": "1996-08-12",
+    "time": "15:30",
+    "location": "上海",
+    "calendar_type": "solar"
+  },
+  "source_stats": {
+    "chat_count": 0,
+    "text_count": 0,
+    "correction_count": 0
+  },
+  "corrections_count": 0,
+  "command_history": [
+    "/create-bazi-persona",
+    "/bazi-persona-rollback"
+  ],
+  "accuracy_mode": "full_chart"
+}

@@ -50,19 +50,15 @@ npm run bazi -- --action create \
   --birth-date "96年8月12日" \
   --birth-time "下午3点半" \
   --birth-location "上海" \
-  --relationships "同事,恋人" \
-  --set-active-relationships "同事" \
-  --true-solar "auto" \
-  --day-rollover 23
+  --relation "同事"
 ```
 
 说明：
 - 默认会在创建时自动排盘并落盘，不需要再手动跑 `bazi_calc`。
 - `--birth-time` 可缺失，系统会自动进入缺时精简模式。
-- 创建与更新默认一次执行到底，不再弹“确认写入”二次交互。
-- 如需取消写入，可显式加 `--yes false`。
+- 交互确认支持回车默认继续，或用 `↑↓`、`1/2`、`y/n` 快捷选择。
+- 自动化场景可加 `--yes true` 跳过确认；`--yes false` 会直接取消写入。
 - 若未传 `--relation`，交互模式会补问一次关系（可填“名人/无关系”）。
-- 创建成功后会自动提示“已切换角色模式”，用户可直接继续对话。
 
 一句话输入示例（给终端用户复制改）：
 
@@ -76,61 +72,7 @@ npm run bazi -- --action create \
 npm run bazi -- --action list
 ```
 
-5. 写入一条记忆（可选）
-
-```bash
-npm run bazi -- --action update \
-  --slug "shi-li-ren-wu" \
-  --memory "他在压力下会先卡边界，再给明确动作指令" \
-  --memory-type "behavior_fact" \
-  --memory-weight "medium"
-```
-
-6. 查询当前大运/流年/流月/流日/流时（可选）
-
-```bash
-npm run bazi -- --action flow \
-  --slug "shi-li-ren-wu" \
-  --at "2026-04-09 20:30"
-```
-
-7. cheatsheet 模式（显式触发）
-
-```bash
-npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --mode on
-
-# 开启后可正常聊天式提问（按问题自动走不同模板）
-npm run bazi -- --action cheatsheet \
-  --slug "shi-li-ren-wu" \
-  --message "我今天状态怎么样？"
-
-# 也支持自然语言开关（不传 --mode）
-npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --message "打开作弊模式"
-npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --message "关闭作弊模式"
-
-# 关闭模式
-npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --mode off
-```
-
-说明：
-- `mode off` 会清空 cheatsheet 会话上下文，避免与正常聊天串味。
-- 记忆分层：`normal` 与 `cheatsheet` 独立，可用 `--action memory --scope normal|cheatsheet` 查看。
-
-8. 合盘分析（两人格）
-
-```bash
-npm run bazi -- --action compat \
-  --slug-a "shi-li-ren-wu" \
-  --slug-b "another-persona"
-```
-
-9. 记忆管理（list/pin/unpin/forget/merge）
-
-```bash
-npm run bazi -- --action memory --slug "shi-li-ren-wu" --op list
-```
-
-7. 卸载测试数据（可选）
+5. 卸载测试数据（可选）
 
 ```bash
 npm run bazi -- --action delete \
@@ -146,10 +88,6 @@ npm run bazi -- --action delete \
 - 主命令：`/list-bazi-personas`
 - 主命令：`/bazi-persona-rollback {slug} {version}`
 - 主命令：`/delete-bazi-persona {slug}`
-- 主命令：`/query-bazi-flow {slug} {datetime?}`
-- 主命令：`/bazi-cheatsheet {slug}`
-- 主命令：`/bazi-compat {slugA} {slugB}`
-- 主命令：`/memory-{list|pin|unpin|forget|merge} {slug}`
 
 友好别名（同义触发）：
 
@@ -158,10 +96,6 @@ npm run bazi -- --action delete \
 - `/list-bazi`
 - `/rollback-bazi`
 - `/delete-bazi`
-- `/flow-bazi`
-- `/cheatsheet-bazi`
-- `/compat-bazi`
-- `/memory-bazi`
 
 ## 目录结构
 
@@ -177,34 +111,22 @@ bazi-persona-skill/
 │   ├── correction_merger.md
 │   └── skill_builder.md
 ├── tools/
-│   ├── core/
-│   │   ├── bazi_calc.ts
-│   │   └── skill_writer.ts
-│   ├── data/
-│   │   ├── gan_zhi_knowledge.ts
-│   │   ├── shengxiao_knowledge.ts
-│   │   └── shishen_knowledge.ts
-│   ├── io/
-│   │   ├── chat_parser.ts
-│   │   └── text_ingest.ts
-│   ├── runtime/
-│   │   ├── meta_updater.ts
-│   │   └── version_manager.ts
-│   └── utils/
-│       ├── _shared.ts
-│       ├── confirm_prompt.ts
-│       └── slugify.ts
+│   ├── _shared.ts
+│   ├── bazi_calc.ts
+│   ├── chat_parser.ts
+│   ├── text_ingest.ts
+│   ├── skill_writer.ts
+│   ├── version_manager.ts
+│   ├── slugify.ts
+│   └── meta_updater.ts
 ├── personas/
 │   └── {slug}/
 │       ├── SKILL.md
-│       ├── .runtime/
-│       │   ├── persona.core.json
-│       │   ├── state.current.json
-│       │   ├── bazi.evidence.json
-│       │   ├── meta.json
-│       │   └── memory.log.jsonl
-│       │   ├── memory.index.json
-│       │   └── memory.pins.json
+│       ├── persona.md
+│       ├── state.md
+│       ├── chart.json
+│       ├── corrections.md
+│       ├── meta.json
 │       └── versions/
 ├── package.json
 └── tsconfig.json
@@ -215,10 +137,7 @@ bazi-persona-skill/
 - 首次创建只需基础 5 项：名称、出生日期、出生时间（可暂缺）、出生地点、性别。
 - 缺失出生时间时支持精简精度版：内部中午 12:00 排盘，输出去时柱化并明确提示精度差异。
 - 每次关键写入前提供短预览，强调“可执行人格规则”而非泛分析。
-- 创建/更新默认单次执行完成，不做重复确认。
-- 对外单文件：用户主要只看 `personas/{slug}/SKILL.md`，八字依据以 Markdown 提炼呈现。
-- 对内结构化：`.runtime` 维护 core/state/evidence/meta/memory，便于可维护更新。
-- `SKILL.md` 内统一承载可执行规则与摘要（纯 Markdown）；结构化数据放在 `.runtime`。
+- 确认交互默认回车继续，降低输入负担；也支持键盘上下选择。
 - 每次更新先自动备份，回滚前再保留一次回滚前快照。
 
 ## 授权提示优化建议（Codex）
@@ -229,10 +148,10 @@ bazi-persona-skill/
 
 ## 示例输出
 
-预览卡示例（展示后默认直接写入）：
+预览卡示例：
 
 ```text
-人格预览
+人格预览（写入前确认）
 1) 一句话人格总结：理性克制，重边界，做事先评估风险再推进。
 2) 说话给人的感觉：简洁直接，结论优先，少废话但不失礼。
 3) 做决定时最看重：最看重可持续性与收益-风险比。
@@ -240,7 +159,24 @@ bazi-persona-skill/
 5) 最近更像的状态：最近处于“稳中提效、收敛风险”的阶段。
 ```
 
-版本快照目录会同时保存 `SKILL.md` 与 `.runtime`，确保回滚后人格与记忆一致。
+`chart.json` 关键字段示例：
+
+```json
+{
+  "accuracy_mode": "missing_time_six_pillars",
+  "requires_birth_time_for_full_accuracy": true,
+  "pillars": {
+    "year": "庚午",
+    "month": "辛巳",
+    "day": "丁丑"
+  },
+  "removed_due_to_missing_time": [
+    "时柱",
+    "与时柱相关的刑冲合会",
+    "时柱衍生关系"
+  ]
+}
+```
 
 ## 质量验证
 

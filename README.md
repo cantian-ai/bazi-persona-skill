@@ -386,13 +386,13 @@ bazi --action help
 
 关联项目：
 
-[- OpenClaw Skills](https://clawhub.ai/tianlinle/cantian-bazi)
++ [OpenClaw Skills](https://clawhub.ai/tianlinle/cantian-bazi)
 
-[- Bazi MCP](https://github.com/cantian-ai/bazi-mcp)
++ [Bazi MCP](https://github.com/cantian-ai/bazi-mcp)
 
-[- GPTs - Chinese Bazi Fortune Teller](https://chatgpt.com/g/g-67c3f7b74d148191a2167f44fd13412d-chinese-bazi-fortune-teller-can-tian-ba-zi-suan-ming-jing-zhun-pai-pan-jie-du)
++ [GPTs - Chinese Bazi Fortune Teller](https://chatgpt.com/g/g-67c3f7b74d148191a2167f44fd13412d-chinese-bazi-fortune-teller-can-tian-ba-zi-suan-ming-jing-zhun-pai-pan-jie-du)
 
-[- iOS App - 参天AI](https://apps.apple.com/app/id6746296534)
++ [iOS App - 参天AI](https://apps.apple.com/app/id6746296534)
 
 ## 联系我们
 

@@ -900,6 +900,28 @@ function formatSolarTermInfo(
   return `${term.term}（第${term.afterDays}天）${next}`;
 }
 
+async function buildFlowShensha(params: {
+  bazi: string;
+  flow: { decade?: string; year: string; month: string; day: string; hour?: string };
+}): Promise<Record<string, string[]>> {
+  const { getShenFromDayun } = (await import("cantian-tymext")) as unknown as {
+    getShenFromDayun: (bazi: string, gan: string, zhi: string) => string[];
+  };
+  const baziStr = params.bazi.replaceAll(" ", "");
+  const results: Record<string, string[]> = {};
+  const calc = (label: string, gz: string) => {
+    if (gz && gz.length >= 2) {
+      results[label] = getShenFromDayun(baziStr, gz[0], gz[1]);
+    }
+  };
+  if (params.flow.decade) calc("大运", params.flow.decade);
+  calc("流年", params.flow.year);
+  calc("流月", params.flow.month);
+  calc("流日", params.flow.day);
+  if (params.flow.hour) calc("流时", params.flow.hour);
+  return results;
+}
+
 async function buildFlowRelations(params: {
   pillars: string[];
   flow: { decade?: string; year: string; month: string; day: string; hour?: string };
@@ -1079,15 +1101,16 @@ async function buildFlowSnapshotMarkdown(params: {
       formatPillarFromRaw(asRecord(params.chart.raw_bazi), "时柱"),
     );
   }
+  const flowConfig = {
+    decade: currentDecade.getSixtyCycle().getName(),
+    year: flowYear,
+    month: flowMonth,
+    day: flowDay,
+    hour: flowHour,
+  };
   const flowRelations = await buildFlowRelations({
     pillars: basePillars,
-    flow: {
-      decade: currentDecade.getSixtyCycle().getName(),
-      year: flowYear,
-      month: flowMonth,
-      day: flowDay,
-      hour: flowHour,
-    },
+    flow: flowConfig,
   });
   const flowRelationLines = Object.entries(flowRelations)
     .map(([label, items]) => {
@@ -1102,6 +1125,23 @@ async function buildFlowSnapshotMarkdown(params: {
     })
     .join("\n");
   const flowRelationFlat = Object.values(flowRelations).flat();
+
+  const baziStr = summarizeValue(asRecord(params.chart.raw_bazi)?.["八字"], 28);
+  const flowShensha = baziStr
+    ? await buildFlowShensha({ bazi: baziStr, flow: flowConfig })
+    : {};
+  const flowShenshaLines = Object.entries(flowShensha)
+    .map(([label, items]) => {
+      if (!items || items.length === 0) {
+        return lang === "en"
+          ? `  - ${label}: none`
+          : `  - ${label}：无`;
+      }
+      return lang === "en"
+        ? `  - ${label}: ${items.join(", ")}`
+        : `  - ${label}：${items.join("、")}`;
+    })
+    .join("\n");
 
   const solarDay = querySolar.getSolarDay();
   const solarMonth = solarDay.getSolarMonth();
@@ -1174,6 +1214,8 @@ async function buildFlowSnapshotMarkdown(params: {
     pickLangLine(lang, `- 今日能量解读：${energySummary}`, `- Energy readout: ${energySummary}`),
     pickLangLine(lang, "- 刑冲合会联动：", "- Relation interactions:"),
     flowRelationLines,
+    pickLangLine(lang, "- 神煞（大运/流年/流月/流日/流时）：", "- Shen-sha (decade/year/month/day/hour):"),
+    flowShenshaLines,
     pickLangLine(lang, "- 关系影响建议：", "- Relation impact suggestions:"),
     interpretRelationEffects(flowRelationFlat, lang),
   ].join("\n");

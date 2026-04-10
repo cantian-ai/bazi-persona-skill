@@ -475,16 +475,30 @@ function normalizeLuckCycles(raw: unknown): unknown {
   );
 }
 
-function normalizeYearlyFortune(raw: unknown): unknown {
-  return (
-    deepFindByKeys(raw, [
-      "liuNian",
-      "liunian",
-      "yearlyFortune",
-      "currentYearFortune",
-      "流年",
-    ]) ?? "（暂未提取到结构化流年信息，可参考 raw_markdown）"
-  );
+function buildYearlyFortune(raw: unknown, pillars: Pillars): unknown {
+  try {
+    const baziRecord = raw as UnknownRecord;
+    const baziStr = (baziRecord?.["八字"] as string ?? "").replaceAll(" ", "");
+    if (!baziStr || baziStr.length < 8) {
+      return "（八字信息不完整，无法计算流年）";
+    }
+
+    // Dynamic import would be async; we are in sync context here.
+    // Build a structured summary from what we already have in raw.
+    const year = new Date().getFullYear();
+    const pillarArr = [pillars.year, pillars.month, pillars.day, pillars.hour].filter(
+      (p): p is string => !!p,
+    );
+
+    return {
+      current_year: year,
+      pillars: pillarArr,
+      bazi: baziStr,
+      note: "流年干支、神煞与刑冲合会由运行时 buildFlowSnapshotMarkdown 实时计算",
+    };
+  } catch {
+    return "（流年信息计算失败，可参考 raw_markdown）";
+  }
 }
 
 async function calcRawBazi(args: {
@@ -605,7 +619,7 @@ export async function buildChart(input: BaziCalcInput): Promise<BaziChart> {
     ten_gods: normalizeTenGods(rawResult.raw),
     luck_cycles: normalizeLuckCycles(rawResult.raw),
     current_year: new Date().getFullYear(),
-    yearly_fortune: normalizeYearlyFortune(rawResult.raw),
+    yearly_fortune: buildYearlyFortune(rawResult.raw, pillars),
     removed_due_to_missing_time: [],
     raw_markdown: rawResult.markdown,
     raw_bazi: rawResult.raw,

@@ -1,26 +1,26 @@
-# 八字人格 (Bazi Persona)
+# 八字人格 Bazi Persona Skill
 
-**Bazi Persona Skill — AI persona powered by Chinese astrology**
+**一个生日，一个活的人格。**
 
-**一个生日，一个活的人格。** 基于八字命理，生成会聊天、有情绪、会随时间变化的 AI 人格。
-
-**One birthday, one living persona.** Generate an AI persona from Bazi (Chinese astrology) that talks, feels, and evolves over time.
+基于八字命理，生成会聊天、有情绪、会随时间变化的 AI 人格。
 
 [![npm](https://img.shields.io/npm/v/bazi-persona-skill)](https://www.npmjs.com/package/bazi-persona-skill)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-**Cantian AI / 参天AI** &nbsp; · &nbsp; Claude Code &nbsp; · &nbsp; OpenClaw &nbsp; · &nbsp; Natural Language First
+[繁體中文](./README.zh-TW.md) | [English](./README.en.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
+
+**参天AI / Cantian AI** &nbsp; · &nbsp; Claude Code &nbsp; · &nbsp; OpenClaw &nbsp; · &nbsp; 45+ Agent 平台
 
 - **一个生日就能创建** — 给个名字和出生日期，几秒钟生成完整人格，不用懂八字
-- **不是算命，是活的人格** — 会聊天、有脾气、会随”大运/流年/流月/流日/流时“变化，不只是静态人格
-- **作弊模式** — 一句话切换到深度剖析，从八字的静态和动态角度拆解状态、决策、趋势
+- **不是算命，是活的人格** — 会聊天、有脾气、会随大运/流年/流月/流日/流时变化
+- **作弊模式** — 一句话切换深度剖析，从八字的静态和动态角度拆解状态、决策、趋势
 - **越聊越真** — 每一条真实信息都会让人格更准确，不是固定模板
 - **说人话就能用** — 不用学命令，自然语言对话搞定一切
 - **纯本地运行** — 不联网、不上传，所有数据留在你的机器上
 
 ---
 
-## 先看效果 / See It In Action
+## 先看效果
 
 ### 一句话创建人格
 
@@ -242,11 +242,11 @@ Bazi Persona Skill：
 
 ---
 
-## Quick Start / 快速开始
+## 快速开始 Quick Start
 
-### Step 1：安装
+### Step 1：安装 Install
 
-在 Claude Code 或 OpenClaw 的对话框里粘贴这句话：
+在任意 AI Agent 对话框里粘贴这句话：
 
 > 帮我执行 `npx skills add cantian-ai/bazi-persona-skill --all` 安装八字人格技能
 
@@ -256,9 +256,9 @@ Bazi Persona Skill：
 npx skills add cantian-ai/bazi-persona-skill --all
 ```
 
-安装完成后，你的 AI 就拥有了八字人格能力。
+`--all` 会自动安装到所有支持的 Agent 平台（Claude Code、OpenClaw、Cursor、Windsurf 等 45+ 平台）。
 
-### Step 2：创建第一个人格
+### Step 2：创建第一个人格 Create
 
 回到对话框，直接说：
 
@@ -268,7 +268,7 @@ npx skills add cantian-ai/bazi-persona-skill --all
 
 AI 会自动排盘、生成人格预览、进入对话模式。
 
-### Step 3：开始使用
+### Step 3：开始使用 Use
 
 创建完成后，你可以直接和人格聊天：
 
@@ -298,7 +298,7 @@ bazi --action help
 
 ---
 
-## Commands / 命令速查
+## 命令速查 Commands
 
 在 Claude Code / OpenClaw 中使用 `/bazi-persona` 入口，或者直接说人话：
 
@@ -319,7 +319,7 @@ bazi --action help
 
 ---
 
-## Agent Integration / 平台集成
+## 平台集成 Agent Integration
 
 创建好的人格可以同步为 Agent 文件，之后不用每次都进 Skill，直接在平台里点名就能开始对话。
 
@@ -378,6 +378,7 @@ bazi --action help
 /bazi-persona agent remove
 ```
 
+---
 
 ## 关于我们
 

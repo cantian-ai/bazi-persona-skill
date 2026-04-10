@@ -8,255 +8,225 @@
 
 ---
 
+## 先看效果 / See It In Action
+
+### 普通聊天 — 她不是在"扮演"，是真的像那个人
+
+```
+👤  舒晴最近是不是心情不太好？
+
+🤖  嗯……怎么说呢，她最近确实有点绷。
+    不是那种会跟你抱怨的类型，但你仔细看就能感觉到——
+    回消息变慢了，语气比平时更"公事公办"。
+    她不是在生气，更像是把精力全收回去了，先顾自己的事。
+
+    丙火日主的人压力大的时候就这样，
+    不是冷，是火力不够了，不想再分给别人。
+```
+
+```
+👤  那我这几天该怎么跟她相处？
+
+🤖  别主动问她"你怎么了"，她会觉得要花力气解释。
+    你就正常在，偶尔递个具体的小东西——
+    比如"这个链接你可能用得上"，或者帮她顺手做一件她没开口的事。
+    她心里是有数的，等她缓过来会主动找你。
+```
+
+> 不是 AI 在背台词，而是基于八字推导出的决策模式、情绪节奏和表达习惯在驱动对话。
+
+### 作弊模式 — 开启"上帝视角"
+
+说一句"打开作弊模式"，就像给对话装上了透视镜：
+
+```
+👤  打开作弊模式
+
+🤖  作弊模式已开启。你现在拥有上帝视角 🔓
+    可以问任何关于她的深层状态、关系动态、未来趋势。
+    随时说"关闭作弊模式"回到正常聊天。
+```
+
+```
+👤  她对我到底什么态度？
+
+🤖  【合盘分析】
+    你的壬水 vs 她的丙火 = 偏官关系
+    她心里觉得你"有点压力但能推着她动"。
+    不是那种让她放松的人，但是那种让她变好的人。
+
+    当前流月天干透庚金，她的表达欲被压了一层，
+    所以你会觉得她最近不太搭理你——不是态度变了，是说话的能量被借走了。
+
+    ⏰ 下个月辛金流月，沟通会回暖。
+    💡 建议：这个月别追问感受，多聊具体事务。
+```
+
+```
+👤  她明年运势怎么样？
+
+🤖  【2027 流年预览 · 丁未年】
+    天干丁火帮身 → 状态明显回升，信心和行动力都比今年强。
+    地支未土为食伤 → 表达欲爆发，可能会主动发起新项目或换赛道。
+
+    关键节点：
+    📌 农历三月（甲辰月）：有贵人机会，但需要她自己开口争取
+    📌 农历八月（庚申月）：财运集中爆发期，抓住别犹豫
+    ⚠️ 农历十一月（壬子月）：水旺克火，注意健康和情绪低谷
+
+    整体：比 2026 好很多。用一个词形容——"该她了"。
+```
+
+> 作弊模式下可以像上帝一样提问，但不影响正常聊天——关掉就回到普通对话。
+
+### 创建人格 — 一句话就够
+
+```
+👤  帮我创建八字人格：小A，女，96年8月12日下午3点半，上海人，我同事
+
+🤖  排盘完成 ✓
+
+    【人格预览】
+    1. 一句话总结：表面随和实际主意很正，做事先算清楚再出手
+    2. 说话感觉：不废话但也不冷，会照顾你但不会惯着你
+    3. 做决定看重：可持续性和风险收益比
+    4. 压力下变化：更强调底线和交付，沟通变简洁
+    5. 最近状态：稳中提效，有意识地收敛社交
+
+    MBTI 映射：INTJ（八字推导）
+    · I → 日主丙火坐申金，能量内收不外放
+    · N → 食伤生财链完整，直觉驱动决策
+    · T → 偏官+偏印组合，逻辑优先于感受
+    · J → 年柱己卯正印，安全感来自计划和掌控
+
+    已进入 [小A] 对话模式 ✓
+    下一句话开始，我就是她。
+```
+
+---
+
 ## Highlights / 亮点
 
 | | 中文 | English |
 |---|---|---|
 | **零基础** | 不懂八字也能用，自然语言输入即可 | No Bazi knowledge needed — just talk |
+| **不是分析报告** | 生成的是会聊天的人格，不是一堆术语 | A talking persona, not a static report |
 | **作弊模式** | 上帝视角看状态、关系、趋势，随时切回正常聊天 | God-view on status, compatibility & trends |
 | **MBTI 映射** | 八字自动推导 EI/SN/TF/JP，让性格差异更直观 | Auto-maps Bazi to MBTI for intuitive contrast |
 | **时运追踪** | 大运 / 流年 / 流月 / 流日 / 流时，实时能量解读 | Real-time luck-cycle energy reading |
 | **合盘分析** | 两个人格一键合盘，看关系互动模式 | One-click compatibility between two personas |
-| **Agent 集成** | 一键同步到 Claude Code / OpenClaw，直接对话 | One-command sync to Claude Code / OpenClaw |
-| **版本管理** | 每次更新自动备份，支持一键回滚 | Auto-backup on every update, one-click rollback |
-| **多语言** | 自动跟随用户语言，支持中 / 英显式切换 | Auto-follows user language; `--lang zh/en` override |
+| **越聊越真** | 补充事实后人格自动进化，不是固定模板 | Persona evolves with every new fact you add |
+| **Agent 原生** | 为 Claude Code / OpenClaw 设计，对话即用 | Built for Claude Code / OpenClaw — just talk |
+| **纯本地** | 不联网、不上传，所有数据留在你的机器上 | Fully local — no data leaves your machine |
 
 ---
 
 ## Quick Start / 快速开始
 
-### 1. 通过 npx 直接使用（推荐）
+### 在 Claude Code 中使用（推荐）
 
-无需克隆仓库，安装后即可使用：
+1. 安装 Skill
 
 ```bash
-# 全局安装
+npx skills add bazi-persona-skill --skill bazi-persona -a claude-code --copy -y
+```
+
+2. 直接对话
+
+```text
+帮我创建八字人格：小A，1996年8月12日下午3点半，上海，女，同事
+```
+
+就这样。不需要记命令，不需要读文档，说人话就行。
+
+### 在 OpenClaw 中使用
+
+安装方式相同，Skill 会自动适配 OpenClaw 平台。
+
+### 通过 npm 命令行使用
+
+```bash
 npm install -g bazi-persona-skill
-
-# 创建人格
-bazi --action create \
-  --name "舒晴" \
-  --slug "shu-qing" \
-  --gender "女" \
-  --birth-date "99年8月12日" \
-  --birth-time "下午3点半" \
-  --birth-location "上海" \
-  --relationships "同事"
-
-# 查看已有人格
-bazi --action list
-
-# 查看帮助
 bazi --action help
-```
-
-你也可以用 `bazi-persona` 代替 `bazi`，两个命令完全等价。
-
-### 2. 从源码使用
-
-```bash
-git clone <repo-url>
-cd bazi-persona-skill
-npm install
-npm run build
-
-# 通过 npm scripts 使用
-npm run bazi -- --action create --name "舒晴" --slug "shu-qing" ...
-npm run bazi -- --action list
-npm run bazi -- --action help
-```
-
-### 3. 自然语言输入
-
-不需要记命令参数，直接用自然语言描述即可：
-
-```text
-帮我创建八字人格：对象叫小A，1996年8月12日下午3点半，上海，女；我和她是同事。
-```
-
-```text
-Create a persona: Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner.
 ```
 
 ---
 
-## Core Features / 核心功能
+## Commands / 命令
 
-### 创建人格
+在 Claude Code / OpenClaw 中使用 `/bazi-persona` 入口，或者直接说人话：
 
-只需 5 项基础信息：**名称、出生日期、出生时间（可缺）、出生地点、性别**。
+| 你想做什么 | 斜杠命令 | 自然语言 |
+|---|---|---|
+| 创建人格 | `/bazi-persona create` | "帮我创建八字人格：小A，女，96年…" |
+| 查看所有人格 | `/bazi-persona list` | "我有哪些人格？" |
+| 进入人格对话 | `/bazi-persona {id}` | "我要跟小A聊天" |
+| 更新人格 | `/bazi-persona update {id}` | "小A最近升职了，帮我更新" |
+| 开启作弊模式 | `/bazi-persona cheatsheet {id}` | "打开作弊模式" |
+| 查看时运 | `/bazi-persona flow {id}` | "小A最近运势怎样？" |
+| 合盘分析 | `/bazi-persona compat {a} {b}` | "小A和小B合盘" |
+| 万年历 | `/bazi-persona calendar` | "今天黄历怎么样？" |
+| 同步到 Agent | `/bazi-persona agent enable` | "把人格同步到 Claude Code" |
+| 查看帮助 | `/bazi-persona help` | "有哪些命令？" |
 
-```bash
-bazi --action create \
-  --name "示例" --slug "shi-li" \
-  --gender "男" --birth-date "91年3月12日" \
-  --birth-time "中午12点" --birth-location "广州" \
-  --relationships "朋友"
+---
+
+## What Makes It Different / 和普通AI聊天有什么不同
+
+普通 AI 聊天：
+
+```
+👤  帮我模拟一个 INTJ 女生
+
+🤖  好的，我来扮演一个 INTJ 女生。我是一个理性、独立的人……
+    （开始背标签）
 ```
 
-- 出生时间缺失时自动进入精简模式（去时柱），明确提示精度差异
-- 创建时可追加背景信息：`--story "他是清华毕业的，工作很拼"`
-- 创建成功后自动切入人格对话模式
+Bazi Persona Skill：
 
-### 更新人格
+```
+👤  小A今天加班到很晚，我说了句辛苦了，她只回了"嗯"
 
-```bash
-# 补充记忆
-bazi --action update --slug "shi-li" \
-  --memory "他压力下会先卡边界" \
-  --memory-type "behavior_fact"
-
-# 自然语言随聊随记
-bazi --action update --slug "shi-li" \
-  --message "他最近换了工作，心态更开放了"
+🤖  正常，别多想。
+    她不是敷衍你——丙火日主在申月本来就能量不足，
+    加班到这个点火气更弱了，能回你一个字已经是给面子。
+    你要是真想表达关心，明天带杯咖啡，别说"辛苦了"，说"你喝这个"。
+    她记行动不记话。
 ```
 
-### 作弊模式 (Cheatsheet Mode)
-
-像"上帝视角"一样查看人格的深层状态：
-
-```bash
-# 开启
-bazi --action cheatsheet --slug "shi-li" --mode on
-
-# 聊天式提问
-bazi --action cheatsheet --slug "shi-li" --message "我今天状态怎么样？"
-
-# 自然语言开关
-bazi --action cheatsheet --slug "shi-li" --message "打开作弊模式"
-
-# 关闭
-bazi --action cheatsheet --slug "shi-li" --mode off
-```
-
-### 时运查询
-
-查询大运 / 流年 / 流月 / 流日 / 流时：
-
-```bash
-bazi --action flow --slug "shi-li"
-bazi --action flow --slug "shi-li" --at "2026-04-10 20:30"
-```
-
-### 万年历 / 黄历
-
-```bash
-bazi --action calendar
-bazi --action calendar --date "2026-04-10"
-```
-
-### 合盘分析
-
-```bash
-bazi --action compat --slug-a "shi-li" --slug-b "shu-qing"
-```
-
-### 记忆管理
-
-```bash
-bazi --action memory --slug "shi-li" --op list
-```
-
-### 版本回滚
-
-```bash
-bazi --action rollback --slug "shi-li" --version 1
-```
-
-### 删除人格
-
-```bash
-bazi --action delete --slug "shi-li" \
-  --confirm-1 DELETE --confirm-2 shi-li
-```
+区别在于：
+- **不是在"扮演标签"**，是八字推导出的底层决策逻辑在驱动
+- **会随时间变化**，流月流日不同，同一个人的反应也不同
+- **越聊越准**，你补充的真实信息会持续修正人格模型
+- **有"上帝视角"**，作弊模式下你能看到普通聊天看不到的东西
 
 ---
 
 ## Agent Integration / 平台集成
 
-### Claude Code + OpenClaw 一键同步
+将人格同步为 Agent 文件，在 Claude Code / OpenClaw 中直接以人格身份启动对话。
 
-将已创建的人格同步为 Agent 文件，在 Claude Code 或 OpenClaw 中直接以人格身份对话。
-
-```bash
-# 一键引导开启（推荐，会先预览再确认）
-bazi --action agent --op enable
-
-# 查看同步计划
-bazi --action agent --op list
-
-# 直接同步全部人格到两个平台
-bazi --action agent --op sync
-
-# 只同步到 Claude Code
-bazi --action agent --op sync --target claude
-
-# 只同步到 OpenClaw
-bazi --action agent --op sync --target openclaw
-
-# 同步指定人格
-bazi --action agent --op sync --slug "shu-qing"
+```text
+/bazi-persona agent enable
 ```
 
-**默认路径：**
+**默认 Agent 目录：**
 
-| 平台 | Agent 目录 |
+| 平台 | 路径 |
 |---|---|
 | Claude Code | `~/.claude/agents/bazi-persona/` |
 | OpenClaw | `~/.openclaw/agents/bazi-persona/` |
 
-每个人格生成一个独立 agent 文件 + 一个 `bazi-persona-router.md` 路由文件。
+每个人格生成一个独立 agent 文件 + 一个路由文件，同步后直接点名开始对话。
 
-**自定义路径：**
-
-```bash
-bazi --action agent --op sync \
-  --claude-home "/custom/.claude" \
-  --openclaw-home "/custom/.openclaw"
-```
-
-**同步后使用：**
-
-在 Claude Code / OpenClaw 中直接点名角色名称或 ID 即可开始对话。输入"打开作弊模式"或"open cheatsheet mode"进入上帝视角。
-
-**移除 Agent：**
+**高级选项（CLI）：**
 
 ```bash
-bazi --action agent --op remove --confirm DELETE
+npm run bazi:agent:sync:claude          # 只同步到 Claude Code
+npm run bazi:agent:sync:openclaw        # 只同步到 OpenClaw
+npm run bazi:agent:sync -- --slug "id"  # 同步指定人格
+npm run bazi:agent:remove               # 移除全部 Agent
 ```
-
-### Skill 安装（Codex / Cursor 等）
-
-```bash
-# 安装到 Codex
-npx skills add . --skill bazi-persona -a codex
-
-# 全局安装
-npx skills add . --skill bazi-persona -a codex -g
-
-# 安装到多个平台
-npx skills add . --skill bazi-persona -a codex -a claude-code -a cursor --copy -y
-```
-
----
-
-## Slash Commands / 斜杠命令
-
-在 Claude Code 等支持 Skill 的平台中，可直接使用统一入口 `/bazi-persona`：
-
-| 命令 | 说明 |
-|---|---|
-| `/bazi-persona create` | 创建新人格 |
-| `/bazi-persona list` | 查看所有人格 |
-| `/bazi-persona {id}` | 进入该人格对话 |
-| `/bazi-persona update {id}` | 补充资料并更新 |
-| `/bazi-persona cheatsheet {id}` | 开启作弊模式 |
-| `/bazi-persona flow {id}` | 查询时运状态 |
-| `/bazi-persona calendar [date]` | 万年历 / 黄历 |
-| `/bazi-persona compat {idA} {idB}` | 合盘分析 |
-| `/bazi-persona agent enable` | 启用 Agent 同步 |
-| `/bazi-persona agent list` | 查看同步状态 |
-| `/bazi-persona help` | 查看全部命令 |
 
 ---
 
@@ -268,43 +238,44 @@ npx skills add . --skill bazi-persona -a codex -a claude-code -a cursor --copy -
 
 ---
 
+## Design Principles / 设计原则
+
+- **对话优先**：为 Agent 设计，自然语言是第一入口
+- **不是报告，是人格**：产出的是"会聊天的规则系统"，不是分析文档
+- **单文件对外**：用户只需关注 `personas/{slug}/SKILL.md`
+- **零术语**：面向用户的输出结论先行，不堆八字术语
+- **纯本地**：所有计算本地完成，不联网、不上传数据
+- **自动备份**：每次更新前自动创建版本快照，支持回滚
+
+---
+
 ## Project Structure / 目录结构
 
 ```text
 bazi-persona-skill/
-├── SKILL.md                  # Skill 定义文件
+├── SKILL.md                  # Skill 定义（Agent 读取的入口）
 ├── prompts/                  # Prompt 模板
 ├── tools/
-│   ├── core/                 # 核心逻辑（排盘、人格生成、MBTI）
+│   ├── core/                 # 排盘、人格生成、MBTI 推导
 │   ├── data/                 # 干支 / 生肖 / 十神知识库
 │   ├── io/                   # 聊天解析、文本摄入
-│   ├── runtime/              # Agent 桥接、版本管理、元数据
+│   ├── runtime/              # Agent 桥接、版本管理
 │   └── utils/                # 工具函数
 ├── dist/                     # 编译产物
-├── personas/                 # 人格数据目录
-│   └── {slug}/
-│       ├── SKILL.md          # 该人格的可执行规则（用户主文件）
-│       ├── .runtime/         # 结构化数据
-│       └── versions/         # 版本快照
-├── package.json
-└── tsconfig.json
+└── personas/                 # 人格数据（本地，不进 git）
+    └── {slug}/
+        ├── SKILL.md          # 该人格的可执行规则
+        ├── .runtime/         # 结构化数据
+        └── versions/         # 版本快照
 ```
-
----
-
-## Design Principles / 设计原则
-
-- **单文件对外**：用户只需关注 `personas/{slug}/SKILL.md`
-- **结构化对内**：`.runtime/` 维护 core / state / evidence / meta / memory
-- **自动备份**：每次更新前自动创建版本快照
-- **零术语**：面向用户的输出不堆砌八字术语，结论先行
-- **纯本地**：所有计算本地完成，不联网、不上传数据
 
 ---
 
 ## Development / 开发
 
 ```bash
+git clone https://github.com/cantian-ai/bazi-persona-skill.git
+cd bazi-persona-skill
 npm install
 npm run build       # 编译 TypeScript
 npm run typecheck   # 类型检查

@@ -5,14 +5,14 @@
 基于生辰八字，生成一个会聊天、会判断、会变化的 AI 人格。  
 不用手动写人设，而是从生日出发，直接开始对话、观察和分析。
 
-Bazi Persona Skill is an AI persona generator based on birth date for Claude Code, OpenClaw, and 45+ agent platforms.
+Bazi Persona Skill is an AI persona generator based on birth date for Claude Code, OpenClaw, Hermes Agent, and 45+ agent platforms.
 
 [![npm](https://img.shields.io/npm/v/bazi-persona-skill)](https://www.npmjs.com/package/bazi-persona-skill)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 [繁體中文](./README.zh-TW.md) | [English](./README.en.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
 
-**参天AI / Cantian AI** &nbsp; · &nbsp; **Claude Code** &nbsp; · &nbsp; **OpenClaw** &nbsp; · &nbsp; **45+ Agent 平台**
+**参天AI / Cantian AI** &nbsp; · &nbsp; **Claude Code** &nbsp; · &nbsp; **OpenClaw** &nbsp; · &nbsp; **Hermes Agent** &nbsp; · &nbsp; **45+ Agent 平台**
 
 ## 功能亮点 Highlights
 
@@ -173,7 +173,7 @@ npx skills add cantian-ai/bazi-persona-skill
 2. 模拟前任、同事、朋友、伴侣、名人等不同对象  
 3. 观察一个人格在不同问题下的反应方式  
 4. 分析关系互动、沟通方式和阶段状态  
-5. 作为 Claude Code、OpenClaw 和其他 Agent 平台中的人格生成能力使用
+5. 作为 Claude Code、OpenClaw、Hermes 和其他 Agent 平台中的人格生成能力使用
 
 ---
 
@@ -191,20 +191,18 @@ npx skills add cantian-ai/bazi-persona-skill
 
 ## 命令速查 Commands
 
-在 Claude Code / OpenClaw 中可以使用 `/bazi-persona`，也可以直接说人话。
+在 Claude Code / OpenClaw / Hermes 中统一使用 `/bazi-persona`，直接说自然语言即可。
 
-| 你想做什么 | 命令 | 自然语言 |
-|---|---|---|
-| 创建人格 | `/bazi-persona create` | 帮我创建八字人格：小A，女，1996年…… |
-| 查看所有人格 | `/bazi-persona list` | 我有哪些人格？ |
-| 进入对话 | `/bazi-persona {id}` | 我要跟小A聊天 |
-| 补充信息 | `/bazi-persona update {id}` | 小A最近升职了，帮我更新 |
-| 打开作弊模式 | `/bazi-persona cheatsheet {id}` | 打开作弊模式 |
-| 时运查询 | `/bazi-persona flow {id}` | 小A最近状态怎样？ |
-| 合盘分析 | `/bazi-persona compat {a} {b}` | 小A和小B合盘 |
-| 万年历 | `/bazi-persona calendar` | 今天黄历怎么样？ |
-| 同步 Agent | `/bazi-persona agent enable` | 把人格同步到 Claude Code |
-| 帮助 | `/bazi-persona help` | 有哪些命令？ |
+| 你想做什么 | 推荐用法 |
+|---|---|
+| 创建人格 | `/bazi-persona` + “帮我创建八字人格：小A，女，1996年……” |
+| 查看已有角色 | `/bazi-persona` + “我有哪些人格？” |
+| 补充信息更新 | `/bazi-persona` + “帮我更新小A：最近升职了” |
+| 打开作弊模式 | `/bazi-persona` + “打开作弊模式” |
+| 时运/状态 | `/bazi-persona` + “看下小A最近状态” |
+| 万年历 | `/bazi-persona` + “今天黄历怎么样？” |
+| 同步到平台 | `/bazi-persona agent enable` |
+| 帮助 | `/bazi-persona help` |
 
 支持中英双语，默认跟随输入语言，也可以用 `--lang zh` 或 `--lang en` 切换。
 
@@ -227,12 +225,15 @@ npx skills add cantian-ai/bazi-persona-skill
 /bazi-persona agent enable
 ```
 
-系统会自动把所有已创建的人格写入 Agent 目录：
+系统会自动把所有已创建的人格写入 Agent/Skill 目录：
 
 | 平台 | Agent 目录 |
 |---|---|
 | Claude Code | `~/.claude/agents/bazi-persona/` |
 | OpenClaw | `~/.openclaw/agents/bazi-persona/` |
+| Hermes Agent | `~/.hermes/skills/bazi-persona/` |
+
+在 Hermes 下会额外提供 SOUL / agent config 的增强写入能力（默认预览后确认，不会直接覆盖你已有内容）。
 
 ### 同步后怎么用
 
@@ -305,7 +306,7 @@ MIT © [Cantian AI 参天AI](https://github.com/cantian-ai)
 
 ## About Bazi Persona Skill
 
-八字人格 Skill 是一个基于出生信息的人格生成工具，也是一个适用于 Claude Code、OpenClaw 和多种 Agent 平台的 AI Persona Skill。
+八字人格 Skill 是一个基于出生信息的人格生成工具，也是一个适用于 Claude Code、OpenClaw、Hermes 和多种 Agent 平台的 AI Persona Skill。
 
 你只需要提供名字和生日，就能创建一个可持续互动的 AI 人格。  
 它不是静态设定卡，也不只是几句标签描述。  

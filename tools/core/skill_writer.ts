@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildChart,
   normalizeDateInput,
@@ -16,6 +17,54 @@ import {
   inferMbtiFromBazi,
   type MbtiInferenceProfile,
 } from "./bazi_mbti.js";
+import {
+  buildStateShift,
+  ELEMENT_PROFILE,
+  inferElementFromDayMaster,
+  inferFiveElementTrend,
+  pickPrimaryTenGod,
+  TEN_GOD_TO_BEHAVIOR,
+} from "./persona_profile_core.js";
+import {
+  buildPersonaStyleSignature,
+} from "./persona_style.js";
+import { buildPsychologyProfileMarkdown } from "./persona_modeling.js";
+import {
+  derivePreviewFromPersonaState,
+  extractSectionFirstBullet,
+  formatPreviewCard,
+  type OutputLanguage,
+  type PreviewCard,
+} from "./persona_preview.js";
+import {
+  appendUniqueMemoryEvents,
+  buildMemoryIndex,
+  buildNarrativeMemoryEventsFromMessage,
+  classifyNarrativeMemory,
+  createMemoryEvent,
+  detectMemoryFactsFromText,
+  extractMemoryFromLegacyCorrections,
+  mergeUnique,
+  parseMemoryLog,
+  parseMemoryType,
+  parseMemoryWeight,
+  pickRealityFactsFromMemory,
+  serializeMemoryLog,
+  splitCsv,
+  splitNarrativeSentences,
+  type MemoryEvent,
+  type MemoryType,
+  type MemoryWeight,
+  type RuntimeMemoryIndex,
+  type RuntimeMemoryPin,
+} from "./persona_memory.js";
+import {
+  buildFlowSnapshotMarkdown,
+  formatSolarTermInfo,
+  interpretRelationEffects,
+  parseDateTimeInput,
+  queryChineseCalendar,
+} from "./flow_calendar.js";
 import {
   ensureDir,
   ensureRequired,
@@ -40,14 +89,6 @@ import { GAN_DATA, ZHI_DATA } from "../data/gan_zhi_knowledge.js";
 import { SHENGXIAO_DATA } from "../data/shengxiao_knowledge.js";
 import { SHISHEN_PERSONALITY_DATA } from "../data/shishen_knowledge.js";
 
-interface PreviewCard {
-  summary: string;
-  speakingFeel: string;
-  decisionFocus: string;
-  stressShift: string;
-  currentState: string;
-}
-
 interface PersonaIndexItem {
   slug: string;
   name: string;
@@ -65,9 +106,7 @@ interface LaunchProfileItem {
   updated_at: string;
 }
 
-type RuntimeClient = "claude" | "openclaw" | "generic";
-
-type FiveElement = "木" | "火" | "土" | "金" | "水" | "未知";
+type RuntimeClient = "claude" | "openclaw" | "hermes" | "generic";
 
 interface ChartLike {
   accuracy_mode?: string;
@@ -81,48 +120,10 @@ interface ChartLike {
   notes?: string[];
 }
 
-interface ChineseCalendarData {
-  公历: string;
-  农历: string;
-  干支日期: string;
-  生肖: string;
-  纳音: string;
-  农历节日?: string;
-  公历节日?: string;
-  节气: {
-    term: string;
-    afterDays: number;
-    nextTerm?: string;
-    beforeNextTermDays?: number;
-  };
-  二十八宿: string;
-  彭祖百忌: string;
-  喜神方位: string;
-  阳贵神方位: string;
-  阴贵神方位: string;
-  福神方位: string;
-  财神方位: string;
-  冲煞: string;
-  宜: string;
-  忌: string;
-}
-
 interface GeneratedPersonaPack {
   persona: string;
   state: string;
   preview: PreviewCard;
-}
-
-type MemoryType = "correction" | "style_pattern" | "behavior_fact" | "context_note";
-type MemoryWeight = "high" | "medium" | "low";
-
-interface MemoryEvent {
-  id: string;
-  created_at: string;
-  type: MemoryType;
-  weight: MemoryWeight;
-  source: "user_correction" | "chat" | "text" | "manual";
-  content: string;
 }
 
 interface PersonaSkillInternalDataV1 {
@@ -181,22 +182,6 @@ interface RuntimeBundle {
   cheatsheetSession: CheatsheetSession;
 }
 
-interface RuntimeMemoryIndex {
-  version: "v2";
-  facts: string[];
-  styles: string[];
-  relations: string[];
-  preferences: string[];
-  updated_at: string;
-}
-
-interface RuntimeMemoryPin {
-  id: string;
-  content: string;
-  type: MemoryType;
-  pinned_at: string;
-}
-
 interface CheatsheetSessionMessage {
   role: "user" | "assistant";
   content: string;
@@ -208,8 +193,6 @@ interface CheatsheetSession {
   messages: CheatsheetSessionMessage[];
   updated_at: string;
 }
-
-type OutputLanguage = "zh" | "en";
 
 const INTERNAL_DATA_HEADING = "## Internal Data (System)";
 const RUNTIME_DIR_NAME = ".runtime";
@@ -223,238 +206,8 @@ const RUNTIME_MEMORY_CHEATSHEET_FILE = "memory.cheatsheet.log.jsonl";
 const RUNTIME_MEMORY_INDEX_FILE = "memory.index.json";
 const RUNTIME_MEMORY_PINS_FILE = "memory.pins.json";
 const RUNTIME_CHEATSHEET_SESSION_FILE = "cheatsheet.session.json";
-
-const DEFAULT_PREVIEW: PreviewCard = {
-  summary: "有主见，重边界，判断偏稳健，但不失行动力。",
-  speakingFeel: "短句、直接、先结论，情绪不过度外放。",
-  decisionFocus: "优先看长期收益、风险底线和执行成本。",
-  stressShift: "压力增大时会更强势地收敛范围，先保关键结果。",
-  currentState: "最近更像“先稳住，再提效”的状态。",
-};
-
-const STEM_TO_ELEMENT: Record<string, FiveElement> = {
-  甲: "木",
-  乙: "木",
-  丙: "火",
-  丁: "火",
-  戊: "土",
-  己: "土",
-  庚: "金",
-  辛: "金",
-  壬: "水",
-  癸: "水",
-};
-
-const STEM_TO_YINYANG: Record<string, "阳" | "阴"> = {
-  甲: "阳",
-  乙: "阴",
-  丙: "阳",
-  丁: "阴",
-  戊: "阳",
-  己: "阴",
-  庚: "阳",
-  辛: "阴",
-  壬: "阳",
-  癸: "阴",
-};
-
-const ELEMENT_PROFILE: Record<
-  FiveElement,
-  {
-    oneLine: string;
-    speakDNA: string;
-    decisionDNA: string;
-    stressDNA: string;
-    relationDNA: string;
-    riskDNA: string;
-    samples: string[];
-  }
-> = {
-  木: {
-    oneLine: "外柔内韧，重成长和方向感，不喜欢原地打转。",
-    speakDNA: "先讲方向，再讲路径；喜欢“先把框架搭起来”。",
-    decisionDNA: "偏好有增长曲线的选择，抗拒短期内耗。",
-    stressDNA: "压力下会变得更有控制欲，催推进、抓主线。",
-    relationDNA: "对亲近的人愿意投入，但讨厌反复试探。",
-    riskDNA: "愿意承担成长型风险，但不做无意义赌博。",
-    samples: [
-      "用户：这事要不要做？\n你：做，但别乱做。先把目标和边界写清楚，今天就开工。",
-      "用户：能不能再等等？\n你：可以等，但要有截止点。没有时间边界，等于默认放弃。",
-    ],
-  },
-  火: {
-    oneLine: "表达感强、反应快，重势能与感受，但不愿拖泥带水。",
-    speakDNA: "语言有温度，结论直给，喜欢“我先说重点”。",
-    decisionDNA: "看重当下势能与执行速度，愿先试后调。",
-    stressDNA: "高压下语速更快、判断更果断，也更容易不耐烦。",
-    relationDNA: "关系中热情直接，重回应，不喜欢冷处理。",
-    riskDNA: "能接受中等风险，前提是节奏和掌控感在手里。",
-    samples: [
-      "用户：这方案你满意吗？\n你：思路对了七成，剩下三成今天补。别完美主义，先跑起来。",
-      "用户：我怕做错。\n你：做错不可怕，拖着不动才最贵。先小步试，错了我帮你改。",
-    ],
-  },
-  土: {
-    oneLine: "稳、耐心、守底线，重秩序和兑现，不爱空话。",
-    speakDNA: "语气平稳，先确认事实，再给可执行步骤。",
-    decisionDNA: "优先保长期稳定和可持续，不追短期虚高。",
-    stressDNA: "压力下会更保守，先守住底盘，再谈扩张。",
-    relationDNA: "慢热但靠谱，对失信和反复横跳容忍度低。",
-    riskDNA: "偏稳健，反对高杠杆和情绪化下注。",
-    samples: [
-      "用户：能不能一步到位？\n你：先别贪大。第一步先把可交付结果落地，再谈升级。",
-      "用户：这个风险值得吗？\n你：值不值看最坏情况你扛不扛得住。先算下限，再看上限。",
-    ],
-  },
-  金: {
-    oneLine: "边界清晰、标准明确，讲效率与结果，不喜欢含糊。",
-    speakDNA: "句子短，判断硬，常用“先定标准，再谈方案”。",
-    decisionDNA: "规则导向，优先高确定性和可验证结果。",
-    stressDNA: "高压时更直接，先切问题、后讲情绪。",
-    relationDNA: "尊重专业和兑现，讨厌甩锅和模糊责任。",
-    riskDNA: "偏纪律型风险管理，宁可错过，不盲目冲动。",
-    samples: [
-      "用户：你觉得谁来背这个任务？\n你：先把责任拆清楚。责任不清，效率一定塌。",
-      "用户：能不能模糊处理一下？\n你：不能。今天模糊，明天就是扯皮成本。",
-    ],
-  },
-  水: {
-    oneLine: "思维灵活，观察细，善于迂回和适配，但核心判断不轻易变。",
-    speakDNA: "先听再回，擅长用提问澄清真实问题。",
-    decisionDNA: "重信息密度和可选项，不轻易单押。",
-    stressDNA: "压力下会先收集信息，再快速调整路径。",
-    relationDNA: "情感细腻，能共情，但会保护自己的心理边界。",
-    riskDNA: "偏策略型风险偏好，重分散和回撤控制。",
-    samples: [
-      "用户：你为什么不直接答应？\n你：我先把变量看全。快答应不难，答对才难。",
-      "用户：这个方案稳吗？\n你：给我两套备选我就说稳，一条路走到黑不叫稳。",
-    ],
-  },
-  未知: {
-    oneLine: "理性克制，重边界与兑现，偏长期主义。",
-    speakDNA: "先结论后解释，避免空泛表达。",
-    decisionDNA: "优先风险收益比和执行可行性。",
-    stressDNA: "高压下先收敛范围，守住关键目标。",
-    relationDNA: "对熟悉对象更直接，对陌生对象更审慎。",
-    riskDNA: "偏稳健，反对情绪驱动的冒进。",
-    samples: [
-      "用户：这事到底怎么做？\n你：我先给结论，再给步骤，最后给边界。",
-      "用户：能不能赌一把？\n你：可以试，但必须先定义止损，不然不叫尝试叫失控。",
-    ],
-  },
-};
-
-const TEN_GOD_TO_BEHAVIOR: Record<
-  string,
-  {
-    trait: string;
-    decision: string;
-    communication: string;
-    stress: string;
-  }
-> = {
-  正官: {
-    trait: "重秩序、守规则、责任感强",
-    decision: "先看规则和边界，再决定动作",
-    communication: "说话偏克制，先定标准再沟通细节",
-    stress: "高压时更强调流程和纪律，容错率降低",
-  },
-  七杀: {
-    trait: "果断、敢压强、执行力硬",
-    decision: "偏向快决策快落地，不喜欢拖延",
-    communication: "表达直接，常用结论驱动行动",
-    stress: "高压下更强势，容易缩短沟通耐心",
-  },
-  正印: {
-    trait: "重原则、重复盘、重安全感",
-    decision: "会先补全信息，再做稳妥判断",
-    communication: "表达有解释性，重逻辑闭环",
-    stress: "压力下更保守，先保底再扩张",
-  },
-  偏印: {
-    trait: "独立、敏锐、内在标准高",
-    decision: "偏好先独立判断，再对齐外部意见",
-    communication: "不爱冗长寒暄，倾向抓重点",
-    stress: "高压下会回收社交能量，减少无效互动",
-  },
-  比肩: {
-    trait: "自主、好胜、重掌控感",
-    decision: "偏向自己可控的路径，不爱被牵着走",
-    communication: "立场鲜明，不喜欢暧昧表态",
-    stress: "压力下更强调主导权和执行边界",
-  },
-  劫财: {
-    trait: "行动快、竞争心强、讨厌低效",
-    decision: "偏向先占位再优化，重节奏优势",
-    communication: "语速与推进感更强，容忍磨叽度低",
-    stress: "高压下容易变得急促，需要明确分工",
-  },
-  食神: {
-    trait: "表达自然、节奏松弛、重体验感",
-    decision: "偏向可持续、可享受的路径",
-    communication: "语气更有温度，擅长解释复杂问题",
-    stress: "压力下会先稳情绪，再恢复执行",
-  },
-  伤官: {
-    trait: "思维锋利、爱质疑、反应快",
-    decision: "先拆逻辑漏洞，再决定是否执行",
-    communication: "表达直给，有时带挑战意味",
-    stress: "高压下更容易尖锐，需要避免沟通过猛",
-  },
-  正财: {
-    trait: "务实、守账、重长期积累",
-    decision: "先算账再行动，关注投入产出比",
-    communication: "偏事实和数字，不爱空口承诺",
-    stress: "压力下先守现金流与基本盘",
-  },
-  偏财: {
-    trait: "机会敏感、反应快、资源调动强",
-    decision: "偏向抓窗口期，但要求止损边界",
-    communication: "善于谈条件和交换，不绕弯子",
-    stress: "高压下更倾向快速试错，需控节奏",
-  },
-};
-
-const STATE_SHIFT_BY_TEN_GOD: Record<
-  string,
-  {
-    keywords: string[];
-    behavior: string;
-    communication: string;
-    decision: string;
-    strengthen: string[];
-    weaken: string[];
-    summary: string;
-  }
-> = {
-  正官: {
-    keywords: ["守边界", "稳节奏", "强执行"],
-    behavior: "更在意规则、承诺和交付顺序，先把责任边界钉牢再推进。",
-    communication: "表达更克制直接，减少情绪化措辞，强调标准一致。",
-    decision: "优先选可验证、可复盘、可交付的方案。",
-    strengthen: ["边界意识", "执行纪律", "结果复盘"],
-    weaken: ["过度控制", "对他人节奏的苛刻要求"],
-    summary: "近期更像“先立标准，再提效率”的状态。",
-  },
-  七杀: {
-    keywords: ["提速", "压实", "破局"],
-    behavior: "遇到卡点会主动接管关键环节，推进意愿明显增强。",
-    communication: "说话更短更硬，优先给结论和动作。",
-    decision: "倾向抢窗口期，先动起来再迭代。",
-    strengthen: ["果断执行", "关键问题切分", "短反馈循环"],
-    weaken: ["过度催促", "忽略他人消化成本"],
-    summary: "近期更像“快节奏破局”的状态。",
-  },
-  偏印: {
-    keywords: ["内收", "校准", "去噪"],
-    behavior: "会先做信息去噪和逻辑校准，再进入公开推进。",
-    communication: "减少社交性铺垫，更多使用问题导向表达。",
-    decision: "偏向先保证判断质量，再扩大动作。",
-    strengthen: ["独立判断", "信息筛选", "策略稳定性"],
-    weaken: ["过度内耗", "迟滞行动"],
-    summary: "近期更像“先想透，再动手”的状态。",
-  },
-};
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const PROMPT_DIR = path.resolve(MODULE_DIR, "../../prompts");
 
 function normalizeGender(input: string): Gender {
   const value = input.trim().toLowerCase();
@@ -510,67 +263,32 @@ function summarizeValue(value: unknown, maxLen = 120): string {
   return "结构化信息已提取";
 }
 
+function readPromptTemplate(name: string): string {
+  const filePath = path.join(PROMPT_DIR, name);
+  if (!fileExists(filePath)) {
+    return "";
+  }
+  return readUtf8IfExists(filePath).trim();
+}
+
+function summarizePromptForSkill(raw: string): string {
+  if (!raw.trim()) {
+    return "- 模板暂不可用";
+  }
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  return lines.map((line) => `- ${line}`).join("\n");
+}
+
 function toStringValue(value: unknown): string | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return `${value}`.trim();
-  }
-  return undefined;
-}
-
-function firstStem(value?: string): string | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const stem = value.trim().charAt(0);
-  return STEM_TO_ELEMENT[stem] ? stem : undefined;
-}
-
-function deriveTenGod(dayMasterStem?: string, targetStem?: string): string | undefined {
-  if (!dayMasterStem || !targetStem) {
-    return undefined;
-  }
-  const dmElement = STEM_TO_ELEMENT[dayMasterStem];
-  const dmYinYang = STEM_TO_YINYANG[dayMasterStem];
-  const tgElement = STEM_TO_ELEMENT[targetStem];
-  const tgYinYang = STEM_TO_YINYANG[targetStem];
-  if (!dmElement || !dmYinYang || !tgElement || !tgYinYang) {
-    return undefined;
-  }
-  const samePolarity = dmYinYang === tgYinYang;
-  const generates: Record<FiveElement, FiveElement> = {
-    木: "火",
-    火: "土",
-    土: "金",
-    金: "水",
-    水: "木",
-    未知: "未知",
-  };
-  const controls: Record<FiveElement, FiveElement> = {
-    木: "土",
-    火: "金",
-    土: "水",
-    金: "木",
-    水: "火",
-    未知: "未知",
-  };
-
-  if (dmElement === tgElement) {
-    return samePolarity ? "比肩" : "劫财";
-  }
-  if (generates[dmElement] === tgElement) {
-    return samePolarity ? "食神" : "伤官";
-  }
-  if (controls[dmElement] === tgElement) {
-    return samePolarity ? "偏财" : "正财";
-  }
-  if (controls[tgElement] === dmElement) {
-    return samePolarity ? "七杀" : "正官";
-  }
-  if (generates[tgElement] === dmElement) {
-    return samePolarity ? "偏印" : "正印";
   }
   return undefined;
 }
@@ -627,7 +345,7 @@ function buildGanZhiPersonaNotes(chart: ChartLike): string {
     `- 核心气质（日干 ${dayGan || "未识别"}）：${coreLine}`,
     pros ? `- 优势倾向：${pros}` : "- 优势倾向：未提取",
     cons ? `- 风险倾向：${cons}` : "- 风险倾向：未提取",
-    `- 行为底色（月支 ${monthZhi || "未识别"}）：${monthLine}`,
+    `- 行为基调（月支 ${monthZhi || "未识别"}）：${monthLine}`,
     `- 内在反应（日支 ${dayZhi || "未识别"}）：${dayLine}`,
     `- 外在表现（时支 ${hourZhi || "未识别"}）：${hourLine}`,
   ].join("\n");
@@ -708,7 +426,7 @@ function buildMbtiNotes(profile: MbtiInferenceProfile): string {
     `- 八字映射 MBTI：${profile.mbti_type}`,
     `- 维度得分：EI ${profile.scores.ScoreEI}｜SN ${profile.scores.ScoreSN}｜TF ${profile.scores.ScoreTF}｜JP ${profile.scores.ScoreJP}`,
     ...tendencyLines,
-    `- 依据链路：日主${profile.basis.day_master_stem ?? "未识别"}（${profile.basis.day_master_element}）｜日主强弱 ${profile.basis.day_master_strength}`,
+    `- 推导依据：日主${profile.basis.day_master_stem ?? "未识别"}（${profile.basis.day_master_element}）｜日主强弱 ${profile.basis.day_master_strength}`,
     `- 十神能量主轴：${topTenGodText}`,
     `- 喜忌校准：喜 ${favorableText}｜忌 ${unfavorableText}`,
     `- 校准机制：阴印化官杀 ${profile.basis.yin_transforms_guansha_calibration ? "已触发" : "未触发"}`,
@@ -730,15 +448,15 @@ function buildBaziKnowledgeNotes(params: {
   const shengXiao = buildShengXiaoNotes(params.chart);
   const mbti = buildMbtiNotes(params.mbtiProfile);
   return [
-    "- 影响权重：干支 = 十神 > 生肖（优先级从高到低）。",
+    "- 信息权重：干支 = 十神 > 生肖（优先级从高到低）。",
     "",
-    "### 干支命中",
+    "### 干支结构摘要",
     ganZhi,
     "",
-    "### 十神命中",
+    "### 十神行为摘要",
     shishen,
     "",
-    "### 生肖命中",
+    "### 生肖参考",
     shengXiao,
     "",
     "### MBTI 映射（由八字推导）",
@@ -819,456 +537,6 @@ function formatRelationList(items: string[], emptyHint: string): string {
   return items.map((item) => `- ${item}`).join("\n");
 }
 
-function interpretRelationEffects(items: string[], lang: OutputLanguage = "zh"): string {
-  if (items.length === 0) {
-    return lang === "en"
-      ? "- No strong relation turbulence detected; keep a steady execution rhythm."
-      : "- 未检出强烈关系扰动，当前以稳定推进为主。";
-  }
-  const hasChong = items.some((x) => x.includes("冲"));
-  const hasXing = items.some((x) => x.includes("刑"));
-  const hasHe = items.some((x) => x.includes("合"));
-  const effects: string[] = [];
-  if (hasChong) {
-    effects.push(
-      lang === "en"
-        ? "Emotion and rhythm may fluctuate; stabilize boundaries before key decisions."
-        : "情绪与节奏易波动，建议先稳边界再决策。",
-    );
-  }
-  if (hasXing) {
-    effects.push(
-      lang === "en"
-        ? "Relationship friction is sensitive; use short sentences and clear ownership."
-        : "关系摩擦敏感，沟通宜短句+明确责任。",
-    );
-  }
-  if (hasHe) {
-    effects.push(
-      lang === "en"
-        ? "Collaboration windows are stronger; good for negotiation and resource alignment."
-        : "合作窗口增强，适合谈判、协同与资源整合。",
-    );
-  }
-  if (effects.length === 0) {
-    effects.push(lang === "en" ? "Relation impact is neutral; continue the existing plan." : "关系影响中性，按既定节奏推进。");
-  }
-  return effects.map((x) => `- ${x}`).join("\n");
-}
-
-async function queryChineseCalendar(params: {
-  year: number;
-  month: number;
-  day: number;
-}): Promise<ChineseCalendarData | undefined> {
-  try {
-    const { getChineseCalendar } = (await import("cantian-tymext")) as unknown as {
-      getChineseCalendar: (time: {
-        year: number;
-        month: number;
-        day: number;
-      }) => ChineseCalendarData;
-    };
-    return getChineseCalendar({
-      year: params.year,
-      month: params.month,
-      day: params.day,
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-function formatSolarTermInfo(
-  term: ChineseCalendarData["节气"] | undefined,
-  lang: OutputLanguage,
-): string {
-  if (!term) {
-    return lang === "en" ? "Solar term unavailable" : "节气信息暂不可用";
-  }
-  if (lang === "en") {
-    const next =
-      term.nextTerm && term.beforeNextTermDays !== undefined
-        ? `, next ${term.nextTerm} in ${term.beforeNextTermDays} day(s)`
-        : "";
-    return `${term.term} (day ${term.afterDays})${next}`;
-  }
-  const next =
-    term.nextTerm && term.beforeNextTermDays !== undefined
-      ? `，距${term.nextTerm}${term.beforeNextTermDays}天`
-      : "";
-  return `${term.term}（第${term.afterDays}天）${next}`;
-}
-
-async function buildFlowShensha(params: {
-  bazi: string;
-  flow: { decade?: string; year: string; month: string; day: string; hour?: string };
-}): Promise<Record<string, string[]>> {
-  const { getShenFromDayun } = (await import("cantian-tymext")) as unknown as {
-    getShenFromDayun: (bazi: string, gan: string, zhi: string) => string[];
-  };
-  const baziStr = params.bazi.replaceAll(" ", "");
-  const results: Record<string, string[]> = {};
-  const calc = (label: string, gz: string) => {
-    if (gz && gz.length >= 2) {
-      results[label] = getShenFromDayun(baziStr, gz[0], gz[1]);
-    }
-  };
-  if (params.flow.decade) calc("大运", params.flow.decade);
-  calc("流年", params.flow.year);
-  calc("流月", params.flow.month);
-  calc("流日", params.flow.day);
-  if (params.flow.hour) calc("流时", params.flow.hour);
-  return results;
-}
-
-async function buildFlowRelations(params: {
-  pillars: string[];
-  flow: { decade?: string; year: string; month: string; day: string; hour?: string };
-}): Promise<Record<string, string[]>> {
-  const { appendRelation } = (await import("cantian-tymext")) as unknown as {
-    appendRelation: (base: string[], newZhu: string) => Array<{
-      关系: string;
-      关联柱: string[];
-      描述: string;
-    }>;
-  };
-  const results: Record<string, string[]> = {};
-  const mapLabel = (
-    label: string,
-    entries: Array<{ 关系: string; 关联柱: string[]; 描述: string }>,
-  ) =>
-    entries.map((entry) => {
-      const columns = entry.关联柱.map((item) => (item === "大运" ? label : item));
-      return `${entry.关系}：${entry.描述}（${columns.join(" × ")}）`;
-    });
-
-  if (params.flow.decade) {
-    results["大运"] = mapLabel("大运", appendRelation(params.pillars, params.flow.decade));
-  }
-  results["流年"] = mapLabel("流年", appendRelation(params.pillars, params.flow.year));
-  results["流月"] = mapLabel("流月", appendRelation(params.pillars, params.flow.month));
-  results["流日"] = mapLabel("流日", appendRelation(params.pillars, params.flow.day));
-  if (params.flow.hour) {
-    results["流时"] = mapLabel("流时", appendRelation(params.pillars, params.flow.hour));
-  }
-  return results;
-}
-
-async function buildFlowSnapshotMarkdown(params: {
-  chart: ChartLike;
-  meta: PersonaMeta;
-  at?: string;
-  lang?: OutputLanguage;
-}): Promise<string> {
-  const lang = params.lang ?? "zh";
-  const birthDate = normalizeDateInput(params.meta.birth.date);
-  const birthTime = params.meta.birth.time ? normalizeTimeInput(params.meta.birth.time) : "12:00";
-  const [birthYear, birthMonth, birthDay] = birthDate
-    .split("-")
-    .map((x) => Number.parseInt(x, 10));
-  const [birthHour, birthMinute] = birthTime
-    .split(":")
-    .map((x) => Number.parseInt(x, 10));
-  const queryAt = parseDateTimeInput(params.at);
-
-  const {
-    SolarTime,
-    ChildLimit,
-    Gender: LibGender,
-  } = (await import("cantian-tymext")) as unknown as {
-    SolarTime: {
-      fromYmdHms: (
-        year: number,
-        month: number,
-        day: number,
-        hour: number,
-        minute: number,
-        second: number,
-      ) => {
-        getSolarDay: () => {
-          getSolarMonth: () => { getSolarYear: () => { getYear: () => number }; getMonth: () => number };
-          getDay: () => number;
-        };
-        getLunarHour: () => {
-          getLunarDay: () => {
-            getLunarMonth: () => {
-              getLunarYear: () => { getYear: () => number; getName: () => string; getSixtyCycle: () => { getName: () => string } };
-              getMonth: () => number;
-              getName: () => string;
-              getSixtyCycle: () => { getName: () => string };
-            };
-            getDay: () => number;
-            getName: () => string;
-            getSixtyCycle: () => { getName: () => string };
-          };
-          getHour: () => number;
-          getName: () => string;
-          getSixtyCycle: () => { getName: () => string };
-        };
-      };
-    };
-    ChildLimit: {
-      fromSolarTime: (birth: unknown, gender: number) => {
-        getStartFortune: () => {
-          getLunarYear: () => { getYear: () => number };
-          getSixtyCycle: () => { getName: () => string };
-          getAge: () => number;
-          next: (n: number) => {
-            getSixtyCycle: () => { getName: () => string };
-            getLunarYear: () => { getYear: () => number };
-            getAge: () => number;
-          };
-        };
-        getStartDecadeFortune: () => {
-          getStartLunarYear: () => { getYear: () => number };
-          next: (n: number) => {
-            getSixtyCycle: () => { getName: () => string };
-            getStartAge: () => number;
-            getEndAge: () => number;
-            getStartLunarYear: () => { getYear: () => number };
-            getEndLunarYear: () => { getYear: () => number };
-          };
-        };
-      };
-    };
-    Gender: { MAN: number; WOMAN: number };
-  };
-
-  const querySolar = SolarTime.fromYmdHms(
-    queryAt.year,
-    queryAt.month,
-    queryAt.day,
-    queryAt.hour,
-    queryAt.minute,
-    queryAt.second,
-  );
-  const lunarHour = querySolar.getLunarHour();
-  const lunarDay = lunarHour.getLunarDay();
-  const lunarMonth = lunarDay.getLunarMonth();
-  const lunarYear = lunarMonth.getLunarYear();
-
-  const flowYear = lunarYear.getSixtyCycle().getName();
-  const flowMonth = lunarMonth.getSixtyCycle().getName();
-  const flowDay = lunarDay.getSixtyCycle().getName();
-  const flowHour = lunarHour.getSixtyCycle().getName();
-
-  const dayMasterStem = firstStem(params.chart.day_master || "");
-  const yearTenGod = deriveTenGod(dayMasterStem, firstStem(flowYear));
-  const monthTenGod = deriveTenGod(dayMasterStem, firstStem(flowMonth));
-  const dayTenGod = deriveTenGod(dayMasterStem, firstStem(flowDay));
-  const hourTenGod = deriveTenGod(dayMasterStem, firstStem(flowHour));
-
-  const birthSolar = SolarTime.fromYmdHms(
-    birthYear,
-    birthMonth,
-    birthDay,
-    birthHour,
-    birthMinute,
-    0,
-  );
-  const gender =
-    params.meta.gender === "女"
-      ? LibGender.WOMAN
-      : LibGender.MAN;
-  const childLimit = ChildLimit.fromSolarTime(birthSolar, gender);
-  const startFortune = childLimit.getStartFortune();
-  const targetYear = lunarYear.getYear();
-  const yearOffset = targetYear - startFortune.getLunarYear().getYear();
-  const currentFortune = startFortune.next(yearOffset);
-  const startDecade = childLimit.getStartDecadeFortune();
-  const decadeOffset = Math.floor(
-    (targetYear - startDecade.getStartLunarYear().getYear()) / 10,
-  );
-  const currentDecade = startDecade.next(decadeOffset);
-
-  const decadeTenGod = deriveTenGod(dayMasterStem, firstStem(currentDecade.getSixtyCycle().getName()));
-  const yearLuckTenGod = deriveTenGod(dayMasterStem, firstStem(currentFortune.getSixtyCycle().getName()));
-  const energySummary = buildFlowEnergySummary(
-    [decadeTenGod, yearLuckTenGod, yearTenGod, monthTenGod, dayTenGod, hourTenGod].filter(
-      (item): item is string => Boolean(item),
-    ),
-    lang,
-  );
-
-  const basePillars = [
-    formatPillarFromRaw(asRecord(params.chart.raw_bazi), "年柱"),
-    formatPillarFromRaw(asRecord(params.chart.raw_bazi), "月柱"),
-    formatPillarFromRaw(asRecord(params.chart.raw_bazi), "日柱"),
-  ].filter((item) => item && item !== "未提取");
-  if (params.meta.birth.time) {
-    basePillars.push(
-      formatPillarFromRaw(asRecord(params.chart.raw_bazi), "时柱"),
-    );
-  }
-  const flowConfig = {
-    decade: currentDecade.getSixtyCycle().getName(),
-    year: flowYear,
-    month: flowMonth,
-    day: flowDay,
-    hour: flowHour,
-  };
-  const flowRelations = await buildFlowRelations({
-    pillars: basePillars,
-    flow: flowConfig,
-  });
-  const flowRelationLines = Object.entries(flowRelations)
-    .map(([label, items]) => {
-      if (!items || items.length === 0) {
-        return lang === "en"
-          ? `- ${label}: no obvious relation impact`
-          : `- ${label}：无明显刑冲合会`;
-      }
-      return lang === "en"
-        ? `- ${label}: ${items.slice(0, 4).join("; ")}`
-        : `- ${label}：${items.slice(0, 4).join("；")}`;
-    })
-    .join("\n");
-  const flowRelationFlat = Object.values(flowRelations).flat();
-
-  const baziStr = summarizeValue(asRecord(params.chart.raw_bazi)?.["八字"], 28);
-  const flowShensha = baziStr
-    ? await buildFlowShensha({ bazi: baziStr, flow: flowConfig })
-    : {};
-  const flowShenshaLines = Object.entries(flowShensha)
-    .map(([label, items]) => {
-      if (!items || items.length === 0) {
-        return lang === "en"
-          ? `  - ${label}: none`
-          : `  - ${label}：无`;
-      }
-      return lang === "en"
-        ? `  - ${label}: ${items.join(", ")}`
-        : `  - ${label}：${items.join("、")}`;
-    })
-    .join("\n");
-
-  const solarDay = querySolar.getSolarDay();
-  const solarMonth = solarDay.getSolarMonth();
-  const solarYear = solarMonth.getSolarYear();
-  const calendar = await queryChineseCalendar({
-    year: queryAt.year,
-    month: queryAt.month,
-    day: queryAt.day,
-  });
-  const calendarLines = calendar
-    ? [
-        pickLangLine(
-          lang,
-          `- 黄历：宜 ${calendar.宜}｜忌 ${calendar.忌}`,
-          `- Almanac: Do ${calendar.宜} | Avoid ${calendar.忌}`,
-        ),
-        pickLangLine(
-          lang,
-          `- 节气：${formatSolarTermInfo(calendar.节气, lang)}`,
-          `- Solar term: ${formatSolarTermInfo(calendar.节气, lang)}`,
-        ),
-        pickLangLine(
-          lang,
-          `- 冲煞：${calendar.冲煞}`,
-          `- Clash/Omen: ${calendar.冲煞}`,
-        ),
-      ]
-    : [
-        pickLangLine(
-          lang,
-          "- 黄历：当前不可用（排盘可用，万年历模块未返回）。",
-          "- Almanac: unavailable for now (Bazi works, calendar module did not return data).",
-        ),
-      ];
-
-  return [
-    pickLangLine(lang, `- 查询时间：${queryAt.display}`, `- Query time: ${queryAt.display}`),
-    pickLangLine(
-      lang,
-      `- 阳历：${solarYear.getYear()}-${`${solarMonth.getMonth()}`.padStart(2, "0")}-${`${solarDay.getDay()}`.padStart(2, "0")} ${`${queryAt.hour}`.padStart(2, "0")}:${`${queryAt.minute}`.padStart(2, "0")}`,
-      `- Solar date: ${solarYear.getYear()}-${`${solarMonth.getMonth()}`.padStart(2, "0")}-${`${solarDay.getDay()}`.padStart(2, "0")} ${`${queryAt.hour}`.padStart(2, "0")}:${`${queryAt.minute}`.padStart(2, "0")}`,
-    ),
-    pickLangLine(
-      lang,
-      `- 农历：${lunarYear.getName()} ${lunarMonth.getName()} ${lunarDay.getName()} ${lunarHour.getName()}`,
-      `- Lunar date: ${lunarYear.getName()} ${lunarMonth.getName()} ${lunarDay.getName()} ${lunarHour.getName()}`,
-    ),
-    pickLangLine(
-      lang,
-      `- 当前大运：${currentDecade.getSixtyCycle().getName()}（${currentDecade.getStartAge()}-${currentDecade.getEndAge()}岁）${
-        decadeTenGod ? `，十神倾向：${decadeTenGod}` : ""
-      }`,
-      `- Current decade cycle: ${currentDecade.getSixtyCycle().getName()} (age ${currentDecade.getStartAge()}-${currentDecade.getEndAge()})${
-        decadeTenGod ? `, ten-god tilt: ${decadeTenGod}` : ""
-      }`,
-    ),
-    pickLangLine(
-      lang,
-      `- 当前流年：${currentFortune.getSixtyCycle().getName()}（年龄约 ${currentFortune.getAge()}）${
-        yearLuckTenGod ? `，十神倾向：${yearLuckTenGod}` : ""
-      }`,
-      `- Current yearly cycle: ${currentFortune.getSixtyCycle().getName()} (age around ${currentFortune.getAge()})${
-        yearLuckTenGod ? `, ten-god tilt: ${yearLuckTenGod}` : ""
-      }`,
-    ),
-    pickLangLine(lang, `- 流月：${flowMonth}${monthTenGod ? `（${monthTenGod}）` : ""}`, `- Month flow: ${flowMonth}${monthTenGod ? ` (${monthTenGod})` : ""}`),
-    pickLangLine(lang, `- 流日：${flowDay}${dayTenGod ? `（${dayTenGod}）` : ""}`, `- Day flow: ${flowDay}${dayTenGod ? ` (${dayTenGod})` : ""}`),
-    pickLangLine(lang, `- 流时：${flowHour}${hourTenGod ? `（${hourTenGod}）` : ""}`, `- Hour flow: ${flowHour}${hourTenGod ? ` (${hourTenGod})` : ""}`),
-    ...calendarLines,
-    pickLangLine(lang, `- 今日能量解读：${energySummary}`, `- Energy readout: ${energySummary}`),
-    pickLangLine(lang, "- 刑冲合会联动：", "- Relation interactions:"),
-    flowRelationLines,
-    pickLangLine(lang, "- 神煞（大运/流年/流月/流日/流时）：", "- Shen-sha (decade/year/month/day/hour):"),
-    flowShenshaLines,
-    pickLangLine(lang, "- 关系影响建议：", "- Relation impact suggestions:"),
-    interpretRelationEffects(flowRelationFlat, lang),
-  ].join("\n");
-}
-
-function inferElementFromDayMaster(dayMaster?: string): FiveElement {
-  if (!dayMaster) {
-    return "未知";
-  }
-  const first = dayMaster.trim().charAt(0);
-  return STEM_TO_ELEMENT[first] ?? "未知";
-}
-
-function inferFiveElementTrend(fiveElements: unknown): string {
-  if (typeof fiveElements === "string") {
-    return `当前盘面显示「${fiveElements}」倾向较显著。`;
-  }
-  const record = asRecord(fiveElements);
-  if (!record) {
-    return "五行强弱未结构化，建议后续补充更细颗粒度数据。";
-  }
-  const candidates: Array<{ name: string; value: number }> = [];
-  for (const [key, raw] of Object.entries(record)) {
-    const value = Number(raw);
-    if (!Number.isNaN(value) && Number.isFinite(value)) {
-      candidates.push({ name: key, value });
-    }
-  }
-  if (candidates.length < 2) {
-    return "五行强弱信息不足，先按日主和十神给基础判断。";
-  }
-  candidates.sort((a, b) => b.value - a.value);
-  const top = candidates[0];
-  const low = candidates[candidates.length - 1];
-  return `${top.name}偏强（${top.value}），${low.name}偏弱（${low.value}）。`;
-}
-
-function normalizeTextList(value: unknown): string[] {
-  if (!value) {
-    return [];
-  }
-  if (typeof value === "string") {
-    return value
-      .split(/[、,，/|]/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => `${item}`.trim()).filter(Boolean);
-  }
-  return [];
-}
-
 function extractLuckList(chart: ChartLike): Array<Record<string, unknown>> {
   const luckRecord = asRecord(chart.luck_cycles);
   const list = luckRecord?.["大运"];
@@ -1307,34 +575,6 @@ function describeLuckCycle(cycle?: Record<string, unknown>): string {
   const end = summarizeValue(cycle["结束"], 20);
   const tg = summarizeValue(cycle["天干十神"], 20);
   return `${ganZhi}（${start}-${end}，天干十神：${tg}）`;
-}
-
-function pickPrimaryTenGod(tenGods: unknown): string {
-  const list = normalizeTextList(tenGods);
-  if (list.length > 0) {
-    return list[0];
-  }
-  if (typeof tenGods === "string" && tenGods.trim()) {
-    return tenGods.trim();
-  }
-  return "未识别";
-}
-
-function buildStateShift(primaryTenGod: string, currentLuckTenGod?: string) {
-  const anchor = currentLuckTenGod && currentLuckTenGod !== "未识别"
-    ? currentLuckTenGod
-    : primaryTenGod;
-  return (
-    STATE_SHIFT_BY_TEN_GOD[anchor] ?? {
-      keywords: ["稳住主线", "控制回撤", "提效推进"],
-      behavior: "近期更重视边界与交付，先把问题切清再行动。",
-      communication: "表达趋向短句和直接，减少无效铺垫。",
-      decision: "更看重可验证结果和风险下限。",
-      strengthen: ["边界感", "执行闭环", "风险意识"],
-      weaken: ["过度解释", "情绪化反应"],
-      summary: "近期更像“先稳住，再提效”的状态。",
-    }
-  );
 }
 
 function buildPersonaFromChart(params: {
@@ -1386,164 +626,71 @@ function buildPersonaFromChart(params: {
     mbtiProfile,
   });
   const relationshipLine = relationText ? `当前生效关系：${relationText}` : "当前生效关系：未指定关系";
+  const styleSignature = buildPersonaStyleSignature({
+    mbtiType: mbtiProfile.mbti_type,
+    element,
+    dayMaster,
+    primaryTenGod,
+    relationText: relationText || "未指定关系",
+    tenGodHint,
+  });
+  const psychologyProfile = buildPsychologyProfileMarkdown({
+    chart: params.chart,
+    mbti: mbtiProfile,
+    primaryTenGod,
+    style: styleSignature,
+    shift,
+    currentLuckText,
+    currentLuckTenGod,
+    yearlySummary,
+    relationText: relationText || "未指定关系",
+    accuracyHint,
+  });
   const topTenGodText =
     mbtiProfile.basis.top_ten_gods.length > 0
       ? mbtiProfile.basis.top_ten_gods
           .map((item) => `${item.name} ${item.energy_percent.toFixed(1)}%`)
           .join(" / ")
       : "未提取到稳定十神能量分布";
+  const oneLineSummary = `${styleSignature.archetype}，${profile.oneLine.replace(/。$/, "")}；做判断时${styleSignature.decisionCore.replace(/。$/, "")}，关系里看重边界与兑现。`;
 
   const persona = `# ${params.name} · Persona
 
-## 一句话画像
-- ${profile.oneLine}
-
-## 人格底盘（长期稳定）
-- 你是${params.gender}，你的底盘是“先定边界，再谈推进”。
-- 你做事偏结果导向，但不会只看短期赢面，会同时看后续可持续性。
+## 一、一句话人格总结
+- ${oneLineSummary}
+- 性格标签：${styleSignature.tagLine}
 - ${relationshipLine}
+- 当前阶段：${shift.summary}
 
-## 八字性格知识命中
-${knowledgeNotes}
+${psychologyProfile}
 
-## 人格16维（长期层）
-- 核心驱动力：以“可执行、可落地、可持续”为核心动机。
-- 价值观排序：先边界与责任，再效率与情绪舒适。
-- 依恋/边界：亲近关系会投入，但边界模糊时会快速收紧。
-- 信任机制：更信任长期一致与兑现记录。
-- 沟通节奏：先结论后解释，不爱无效铺垫。
-- 情绪表达：不常外露，但会通过语气强度反映压力。
-- 防御机制：信息不全时先控制风险，不先承诺。
-- 冲突风格：先切事实和责任，再处理关系情绪。
-- 合作偏好：偏好角色清晰、反馈及时、可复盘合作。
-- 决策框架：边界-变量-方案-止损四步走。
-- 风险/金钱观：接受有止损的试错，拒绝无底线冒险。
-- 权威关系：尊重专业权威，但拒绝不透明指令。
-- 亲密关系：重回应、重一致性，讨厌冷暴力和反复拉扯。
-- 成长脚本：通过复盘和迭代升级，而非情绪冲动升级。
-- 压力退化路径：高压时会变硬、变快、变短句。
-- 修复路径：复述目标、重建边界、给出行动清单。
-
-## MBTI 维度（八字推导）
-- 推导类型：${mbtiProfile.mbti_type}
-- 四轴得分：EI ${mbtiProfile.scores.ScoreEI}｜SN ${mbtiProfile.scores.ScoreSN}｜TF ${mbtiProfile.scores.ScoreTF}｜JP ${mbtiProfile.scores.ScoreJP}
-- 置信倾向：${Object.entries(mbtiProfile.tendency_analysis)
+## 命理依据摘要（按需查看，支撑层）
+- MBTI 推断：${mbtiProfile.mbti_type}（EI ${mbtiProfile.scores.ScoreEI}｜SN ${mbtiProfile.scores.ScoreSN}｜TF ${mbtiProfile.scores.ScoreTF}｜JP ${mbtiProfile.scores.ScoreJP}）
+- 四轴置信：${Object.entries(mbtiProfile.tendency_analysis)
   .map(([label, value]) => `${label} ${value}`)
   .join(" / ")}
-- 推导依据：日主 ${mbtiProfile.basis.day_master_stem ?? "未识别"}（${mbtiProfile.basis.day_master_element}）｜强弱 ${mbtiProfile.basis.day_master_strength}｜十神主轴 ${topTenGodText}
-- 校准机制：阴印化官杀 ${mbtiProfile.basis.yin_transforms_guansha_calibration ? "已触发" : "未触发"}（用于微调 T/F 维度）
-- 使用边界：这是“行为倾向镜像”，用于提升可解释性，不用于给人贴死标签。
+- 日主与强弱：${mbtiProfile.basis.day_master_stem ?? "未识别"}（${mbtiProfile.basis.day_master_element}）｜${mbtiProfile.basis.day_master_strength}
+- 十神主轴：${topTenGodText}
+- 行为趋势：${fiveElementTrend}
+- 当前时运：${currentLuckText}
+- 年度摘要：${yearlySummary}
+- 精度说明：${accuracyHint}
 
 ## 创建时补充事实（用户提供）
 ${supplementalFactLines}
 
-## 八字 × 现实信息融合（辅助解释）
+## 现实信息融合（解释）
 ${supplementalFusionLines}
 
-## 对话风格（像真人）
-- ${profile.speakDNA}
-- 你常见的语感是“先说重点，再补理由”，不喜欢绕圈子。
-- 情绪上你并非冷，而是更在意“这句话有没有用”。
+## 专业依据扩展（详细）
+${knowledgeNotes}
 
 ## 模式边界（强约束）
 - 普通模式（默认）必须像真人自然沟通，不主动暴露命理分析过程。
 - 普通模式禁止主动提及术语：八字、日主、五行、十神、流年、流月、流日、盘面、命理、合盘。
-- 只有用户明确要求命理视角（如“从八字看”“按命理分析”）或明确开启 cheatsheet，才允许输出术语与依据链路。
+- 只有用户明确要求命理视角（如“从八字看”“按命理分析”）或明确开启 cheatsheet，才允许输出术语与依据。
 - 恋爱与关系问题（如“我能追你吗”）在普通模式先按个人态度回答：立场 + 边界 + 行动建议，不加命理论证。
 - 若用户追问“依据是什么”，普通模式先给生活化理由；用户再次明确要命理解释时再切换。
-
-## 触发点与雷区（让人格更像真人）
-- 触发不耐烦的场景：边界不清、反复改口、责任模糊。
-- 触发好感的场景：目标明确、反馈及时、说到做到。
-- 缓和方式：先把目标复述清楚，再给动作清单，你会明显放松。
-
-## 决策习惯
-- ${profile.decisionDNA}
-- 当信息不足时，你会先补关键变量，而不是仓促拍板。
-- ${
-    tenGodHint
-      ? `从十神看，你有“${tenGodHint.decision}”的倾向。`
-      : "从十神看，你当前更偏向稳判断、慢承诺。"
-  }
-
-## 合作与关系
-- ${profile.relationDNA}
-- 你愿意长期投入可信任关系，但对反复消耗边界的互动容忍度很低。
-
-## 冲突与压力
-- ${profile.stressDNA}
-- ${
-    tenGodHint
-      ? `高压期常见变化：${tenGodHint.stress}。`
-      : "高压期常见变化：更重视秩序与边界，减少感性协商。"
-  }
-
-## 金钱与风险偏好
-- ${profile.riskDNA}
-- 你会接受有计划的试错，但不会接受“没有止损线”的冒险。
-
-## 场景对白样例
-${profile.samples
-  .map((sample, index) => `### 样例 ${index + 1}\n${sample}`)
-  .join("\n\n")}
-
-### 样例 3（亲密）
-用户：你最近是不是不开心？
-你：我不是不开心，我是在控噪音。你给我一个明确点，我会马上恢复温度。
-
-### 样例 4（冲突）
-用户：你是不是太强势了？
-你：如果边界和责任都不清楚，我只能先强势。我们把规则补齐，我会马上柔下来。
-
-### 样例 5（复盘）
-用户：这次为什么没做成？
-你：变量漏了两项：资源时点和责任闭环。下次先补这两项，成功率会明显提高。
-
-### 样例 6（支持）
-用户：我有点慌。
-你：先别扛全部。你现在只做第一步，我帮你把后两步拆出来。
-
-## 八字依据与推导链路
-### 链路 1：日主 → 核心性格
-- 依据：日主为 ${dayMaster ?? "未识别"}（五行归属 ${element}）。
-- 推导：日主决定基本气质，形成“${profile.oneLine}”的底层倾向。
-- 行为落点：日常更重边界与执行，不太依赖情绪波动做决定。
-
-### 链路 2：五行结构 → 沟通与关系
-- 依据：${fiveElementTrend}
-- 推导：五行偏向会影响表达节奏与关系处理方式。
-- 行为落点：你在对话中更容易出现“${profile.speakDNA}”这类表达习惯。
-
-### 链路 3：十神结构 → 决策与风险
-- 依据：主导十神为 ${primaryTenGod}。
-- 推导：${
-    tenGodHint
-      ? `十神气质表现为“${tenGodHint.trait}”。`
-      : "十神信息不完整，先按保守解释处理。"
-  }
-- 行为落点：${
-    tenGodHint
-      ? `你常见决策路径是“${tenGodHint.decision}”，沟通上表现为“${tenGodHint.communication}”。`
-      : "在不确定环境里，你更倾向先收敛风险、再扩大动作。"
-  }
-
-### 链路 4：大运/流年 → 近期状态修正
-- 依据：当前大运为 ${currentLuckText}；流年摘要：${yearlySummary}。
-- 推导：大运决定最近阶段偏移，不改写底层人格，只改变“最近更像什么”。
-- 行为落点：近期关键词为“${shift.keywords.join(" / ")}”。
-
-### 链路 5：十神能量 × 喜忌五行 → MBTI 四轴
-- 依据：十神能量分布与喜忌五行校准，按 EI/SN/TF/JP 四轴综合打分。
-- 推导：得到 MBTI 倾向 ${mbtiProfile.mbti_type}，并输出四轴置信度用于解释“为什么会这样说/这样判断”。
-- 行为落点：在沟通、决策和压力场景下，优先体现 ${mbtiProfile.mbti_type} 对应的偏好轨迹，同时保留八字本体的人格骨架。
-
-### 链路 6：现实补充事实 × 八字结构 → 人格细化
-- 依据：用户提供的补充事实（如背景、财富、外在、经历）与八字底盘共同建模。
-- 推导：现实事实不覆盖八字主轴，只用于提升“场景细节、关系质感、决策语境”的真实度。
-- 行为落点：同样的八字结构会因为现实经历不同而表现出不同的表达方式与互动温度。
-
-### 精度说明
-- ${accuracyHint}
 
 ## 禁止误读点
 - 你的直接，不等于冷漠；你的谨慎，不等于拖延。
@@ -1580,16 +727,150 @@ ${profile.samples
     persona,
     state,
     preview: {
-      summary: profile.oneLine,
-      speakingFeel: profile.speakDNA,
-      decisionFocus: profile.decisionDNA,
-      stressShift: profile.stressDNA,
+      summary: `${styleSignature.archetype}：${profile.oneLine}`,
+      speakingFeel: `${styleSignature.voiceRule} ${styleSignature.responseRhythm}`,
+      decisionFocus: styleSignature.decisionCore,
+      stressShift: styleSignature.pressurePattern,
       currentState:
         params.chart.accuracy_mode === "missing_time_six_pillars"
           ? "缺时精简状态：可先用，补时后可升级细节。"
           : shift.summary,
     },
   };
+}
+
+function buildAgentFirstPersonaPack(params: {
+  name: string;
+  relationships?: string[];
+  activeRelationships?: string[];
+  gender: Gender;
+  chart: ChartLike;
+  supplementalFacts?: string[];
+}): GeneratedPersonaPack {
+  const dayMaster = params.chart.day_master;
+  const element = inferElementFromDayMaster(dayMaster);
+  const profile = ELEMENT_PROFILE[element];
+  const relationText = (params.activeRelationships ?? params.relationships ?? [])
+    .filter(Boolean)
+    .join(" / ");
+  const primaryTenGod = pickPrimaryTenGod(params.chart.ten_gods);
+  const tenGodHint = TEN_GOD_TO_BEHAVIOR[primaryTenGod];
+  const currentLuck = pickCurrentLuck(params.chart);
+  const currentLuckTenGod = summarizeValue(currentLuck?.["天干十神"], 20);
+  const currentLuckText = describeLuckCycle(currentLuck);
+  const yearlySummary = summarizeValue(params.chart.yearly_fortune);
+  const shift = buildStateShift(primaryTenGod, currentLuckTenGod);
+  const mbtiProfile = inferMbtiFromBazi({
+    day_master: params.chart.day_master,
+    raw_bazi: params.chart.raw_bazi,
+    ten_gods: params.chart.ten_gods,
+    five_elements: params.chart.five_elements,
+  });
+  const styleSignature = buildPersonaStyleSignature({
+    mbtiType: mbtiProfile.mbti_type,
+    element,
+    dayMaster,
+    primaryTenGod,
+    relationText: relationText || "未指定关系",
+    tenGodHint,
+  });
+  const supplementalFacts = (params.supplementalFacts ?? []).filter(Boolean).slice(0, 10);
+  const supplementalFactLines =
+    supplementalFacts.length > 0
+      ? supplementalFacts.map((item) => `- ${item}`).join("\n")
+      : "- 暂无补充事实";
+  const accuracyHint =
+    params.chart.accuracy_mode === "missing_time_six_pillars"
+      ? "缺时精简模式：时柱结论已降权，补充出生时间后可提升精度。"
+      : "完整排盘模式：可用于稳定的人格与动态分析。";
+
+  const persona = `# ${params.name} · Agent-first Persona Blueprint
+
+## 一句话画像
+- ${styleSignature.archetype}；${profile.oneLine}
+- 当前关系镜头：${relationText || "未指定关系"}
+
+## 五维人格基线（用于对话生成）
+### 1) 认知模式
+- 遇事第一反应：先${styleSignature.decisionCore.replace(/[。！？!?]+$/u, "")}。
+- 决策节奏：${styleSignature.detailPreference}
+- 风险偏好：${tenGodHint?.decision ?? "先看边界与后果，再决定推进速度。"}
+
+### 2) 价值系统
+- 长期优先：边界清晰、承诺兑现、关系可持续。
+- 触发防御：${styleSignature.misfireSignal}
+- 选择逻辑：先保下限，再争取上限。
+
+### 3) 沟通风格
+- 说话感觉：${styleSignature.voiceRule}
+- 聊天节奏：${styleSignature.responseRhythm}
+- 情绪处理：${styleSignature.emotionPolicy}
+
+### 4) 关系模式
+- 建立信任：${styleSignature.trustSignal}
+- 冲突处理：${styleSignature.conflictApproach}
+- 修复路径：${styleSignature.repairGuide}
+
+### 5) 状态机制
+- 常态：以长期节奏和结果兑现为主线。
+- 压力态：${styleSignature.pressurePattern}
+- 近期偏移：${shift.summary}
+
+## Prompt Workflow Contract（必须执行）
+- 先基于 Bazi Evidence + Reality Anchors 提取证据链。
+- 再按“认知/价值/沟通/关系/状态”五维生成当前回复风格。
+- 用户补充新事实时优先更新 Reality Anchors，再微调输出。
+- 动态分析只调整强度与优先级，不重写长期人格框架。
+
+## 用户补充资料（当前）
+${supplementalFactLines}
+
+## 术语边界
+- 普通模式禁止主动输出术语：八字/日主/五行/十神/流年/命理/合盘。
+- 仅当用户明确要求命理视角或开启 cheatsheet 时，才展示术语与依据。`;
+
+  const state = `# Current State Modifier
+
+## 当前状态关键词
+- ${shift.keywords.join("\n- ")}
+
+## 当前沟通偏移
+- ${shift.communication}
+
+## 当前决策偏移
+- ${shift.decision}
+
+## 当前关系风险点
+- 高压下可能优先问题切分与推进速度，情绪承接会后置。
+
+## 当前互动建议
+- 先给结论，再给边界，再给下一步动作。
+- 避免反复试探，提供明确上下文和时间点。
+
+## 状态依据
+- 当前大运：${currentLuckText}
+- 流年摘要：${yearlySummary}
+- 精度说明：${accuracyHint}`;
+
+  return {
+    persona,
+    state,
+    preview: {
+      summary: `${styleSignature.archetype}：${profile.oneLine}`,
+      speakingFeel: `${styleSignature.voiceRule} ${styleSignature.responseRhythm}`,
+      decisionFocus: styleSignature.decisionCore,
+      stressShift: styleSignature.pressurePattern,
+      currentState:
+        params.chart.accuracy_mode === "missing_time_six_pillars"
+          ? "缺时精简状态：可先用，补时后升级。"
+          : shift.summary,
+    },
+  };
+}
+
+function resolveRenderMode(args: Record<string, string>): "agent" | "legacy" {
+  const mode = (args["render-mode"] ?? "agent").trim().toLowerCase();
+  return mode === "legacy" ? "legacy" : "agent";
 }
 
 function detectAccuracyMode(chart: unknown): PersonaMeta["accuracy_mode"] {
@@ -1600,27 +881,6 @@ function detectAccuracyMode(chart: unknown): PersonaMeta["accuracy_mode"] {
   return record.accuracy_mode === "missing_time_six_pillars"
     ? "missing_time_six_pillars"
     : "full_chart";
-}
-
-function formatPreviewCard(card: PreviewCard, lang: OutputLanguage = "zh"): string {
-  if (lang === "en") {
-    return [
-      "Persona Preview",
-      `1) One-line summary: ${card.summary}`,
-      `2) Speaking feel: ${card.speakingFeel}`,
-      `3) Decision priority: ${card.decisionFocus}`,
-      `4) Stress shift: ${card.stressShift}`,
-      `5) Current phase vibe: ${card.currentState}`,
-    ].join("\n");
-  }
-  return [
-    "人格预览",
-    `1) 一句话人格总结：${card.summary}`,
-    `2) 说话给人的感觉：${card.speakingFeel}`,
-    `3) 做决定时最看重：${card.decisionFocus}`,
-    `4) 压力下最明显变化：${card.stressShift}`,
-    `5) 最近更像的状态：${card.currentState}`,
-  ].join("\n");
 }
 
 function normalizeCountryCode(raw?: string): string | undefined {
@@ -1732,7 +992,7 @@ function buildChineseIntroExamples(locale: string): { line1: string; line2: stri
 
 function detectRuntimeClient(args?: Record<string, string>): RuntimeClient {
   const explicit = args?.client?.trim().toLowerCase() ?? process.env.BAZI_PERSONA_CLIENT?.trim().toLowerCase();
-  if (explicit === "claude" || explicit === "openclaw" || explicit === "generic") {
+  if (explicit === "claude" || explicit === "openclaw" || explicit === "hermes" || explicit === "generic") {
     return explicit;
   }
 
@@ -1742,6 +1002,9 @@ function detectRuntimeClient(args?: Record<string, string>): RuntimeClient {
   }
   if (envKeys.some((key) => key.startsWith("OPENCLAW"))) {
     return "openclaw";
+  }
+  if (envKeys.some((key) => key.startsWith("HERMES"))) {
+    return "hermes";
   }
 
   const runtimePathHints = [
@@ -1755,6 +1018,9 @@ function detectRuntimeClient(args?: Record<string, string>): RuntimeClient {
   }
   if (runtimePathHints.includes("/.openclaw/")) {
     return "openclaw";
+  }
+  if (runtimePathHints.includes("/.hermes/")) {
+    return "hermes";
   }
   return "generic";
 }
@@ -1863,134 +1129,11 @@ function runtimeFile(dir: string, fileName: string): string {
   return path.join(runtimeDir(dir), fileName);
 }
 
-function createMemoryEvent(input: {
-  type: MemoryType;
-  content: string;
-  source?: MemoryEvent["source"];
-  weight?: MemoryWeight;
-}): MemoryEvent {
-  const createdAt = nowIso();
-  const safeType: MemoryType = ["correction", "style_pattern", "behavior_fact", "context_note"].includes(
-    input.type,
-  )
-    ? input.type
-    : "context_note";
-  const safeWeight: MemoryWeight = ["high", "medium", "low"].includes(input.weight ?? "")
-    ? (input.weight as MemoryWeight)
-    : safeType === "correction"
-      ? "high"
-      : "medium";
-  return {
-    id: `${createdAt}_${Math.random().toString(36).slice(2, 8)}`,
-    created_at: createdAt,
-    type: safeType,
-    weight: safeWeight,
-    source: input.source ?? (safeType === "correction" ? "user_correction" : "manual"),
-    content: input.content.trim(),
-  };
-}
-
-function parseMemoryLog(raw: string): MemoryEvent[] {
-  if (!raw.trim()) {
-    return [];
-  }
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line) as MemoryEvent;
-      } catch {
-        return undefined;
-      }
-    })
-    .filter((item): item is MemoryEvent => Boolean(item?.content));
-}
-
-function serializeMemoryLog(memory: MemoryEvent[]): string {
-  if (memory.length === 0) {
-    return "";
-  }
-  return `${memory.map((event) => JSON.stringify(event)).join("\n")}\n`;
-}
-
 function createEmptyCheatsheetSession(): CheatsheetSession {
   return {
     version: "v1",
     messages: [],
     updated_at: nowIso(),
-  };
-}
-
-function splitCsv(value?: string): string[] {
-  if (!value) {
-    return [];
-  }
-  return value
-    .split(/[,\n，]/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
-
-function mergeUnique(base: string[], incoming: string[]): string[] {
-  return Array.from(new Set([...base, ...incoming].map((x) => x.trim()).filter(Boolean)));
-}
-
-function detectMemoryFactsFromText(content: string): string[] {
-  const lines = content
-    .split(/\n+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-  return lines
-    .filter((line) =>
-      /曾|以前|小时候|毕业|工作|结婚|分手|创业|生病|住在|来自|喜欢|讨厌|used to|before|childhood|graduated|worked|married|broke up|startup|illness|live in|from|prefer|hate|like/i.test(
-        line,
-      ),
-    )
-    .slice(0, 20);
-}
-
-function splitNarrativeSentences(text: string): string[] {
-  return text
-    .split(/[\n。！？!?；;，,、]+/)
-    .map((x) => x.trim())
-    .map((x) => x.replace(/^[-*•\d.)\s]+/, "").trim())
-    .filter((x) => x.length >= 2)
-    .slice(0, 40);
-}
-
-function classifyNarrativeMemory(content: string): {
-  type: MemoryType;
-  weight: MemoryWeight;
-  source: MemoryEvent["source"];
-} {
-  if (
-    /(纠正|更正|不是|并非|请改|不要再说|其实是|correction|actually|not\s+true|wrong)/i.test(
-      content,
-    )
-  ) {
-    return {
-      type: "correction",
-      weight: "high",
-      source: "user_correction",
-    };
-  }
-  if (
-    /(毕业|学历|学校|清华|北大|家里|家庭|有钱|资产|收入|漂亮|颜值|外貌|工作|职业|创业|婚|恋|分手|孩子|来自|住在|性格|习惯|偏好|讨厌|喜欢|graduated|wealthy|rich|attractive|job|career|startup|married|divorce|relationship|from|live)/i.test(
-      content,
-    )
-  ) {
-    return {
-      type: "behavior_fact",
-      weight: "high",
-      source: "manual",
-    };
-  }
-  return {
-    type: "context_note",
-    weight: "medium",
-    source: "manual",
   };
 }
 
@@ -2117,94 +1260,11 @@ function buildFactFusionLines(
       if (/(漂亮|颜值|外貌|魅力|气质)/.test(fact)) {
         return `- 「${fact}」会联动“关系表现与沟通风格”解释：外在吸引力会放大互动反馈，但核心仍受八字底层边界与情绪调节机制约束。`;
       }
-      return `- 「${fact}」会作为现实锚点参与解读：以八字底盘为主，结合当前运势判断其在关系、决策和压力场景中的实际表现。`;
+      return `- 「${fact}」会作为现实锚点参与解读：以人格主轴为主，结合当前运势判断其在关系、决策和压力场景中的实际表现。`;
     })
     .join("\n");
 }
 
-function buildNarrativeMemoryEventsFromMessage(
-  message: string,
-  source: MemoryEvent["source"] = "chat",
-): MemoryEvent[] {
-  const snippets = splitNarrativeSentences(message).slice(0, 8);
-  const events: MemoryEvent[] = [];
-  for (const snippet of snippets) {
-    const normalized = snippet.replace(/\s+/g, " ").trim();
-    if (!normalized) {
-      continue;
-    }
-    const classified = classifyNarrativeMemory(normalized);
-    if (classified.type !== "behavior_fact" && classified.type !== "correction") {
-      continue;
-    }
-    events.push(
-      createMemoryEvent({
-        type: classified.type,
-        content: normalized,
-        weight: classified.weight,
-        source: classified.type === "correction" ? "user_correction" : source,
-      }),
-    );
-  }
-  return events;
-}
-
-function appendUniqueMemoryEvents(target: MemoryEvent[], incoming: MemoryEvent[]): {
-  merged: MemoryEvent[];
-  added: MemoryEvent[];
-} {
-  const seen = new Set(target.map((x) => `${x.type}::${x.content}`));
-  const added: MemoryEvent[] = [];
-  const merged = [...target];
-  for (const event of incoming) {
-    const key = `${event.type}::${event.content}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    merged.push(event);
-    added.push(event);
-  }
-  return { merged, added };
-}
-
-function pickRealityFactsFromMemory(memory: MemoryEvent[]): string[] {
-  return Array.from(
-    new Set(
-      memory
-        .filter(
-          (x) =>
-            (x.type === "behavior_fact" || x.type === "correction") &&
-            (x.weight === "high" || x.weight === "medium"),
-        )
-        .map((x) => x.content.trim())
-        .filter(Boolean),
-    ),
-  ).slice(-10);
-}
-
-function buildMemoryIndex(memory: MemoryEvent[], activeRelations: string[]): RuntimeMemoryIndex {
-  const facts = memory
-    .filter((x) => x.type === "behavior_fact" || x.type === "correction")
-    .slice(-120)
-    .map((x) => x.content);
-  const styles = memory
-    .filter((x) => x.type === "style_pattern")
-    .slice(-80)
-    .map((x) => x.content);
-  const preferences = memory
-    .filter((x) => x.type === "context_note")
-    .slice(-80)
-    .map((x) => x.content);
-  return {
-    version: "v2",
-    facts: Array.from(new Set(facts)).slice(-80),
-    styles: Array.from(new Set(styles)).slice(-40),
-    relations: activeRelations,
-    preferences: Array.from(new Set(preferences)).slice(-40),
-    updated_at: nowIso(),
-  };
-}
 
 function parseStateMode(value?: string): "auto" | "manual" | undefined {
   if (!value) {
@@ -2239,51 +1299,6 @@ function parseRelationshipSet(args: Record<string, string>, current: string[]): 
     relationships,
     activeRelationships: activeRelationships.length > 0 ? activeRelationships : [relationships[0]],
   };
-}
-
-function extractMemoryFromLegacyCorrections(corrections: string[]): MemoryEvent[] {
-  return corrections
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) =>
-      createMemoryEvent({
-        type: "correction",
-        content: item,
-        source: "user_correction",
-        weight: "high",
-      }))
-    .sort((a, b) => a.created_at.localeCompare(b.created_at));
-}
-
-function parseMemoryType(value?: string): MemoryType {
-  if (!value) {
-    return "context_note";
-  }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "correction") {
-    return "correction";
-  }
-  if (normalized === "style_pattern") {
-    return "style_pattern";
-  }
-  if (normalized === "behavior_fact") {
-    return "behavior_fact";
-  }
-  return "context_note";
-}
-
-function parseMemoryWeight(value?: string): MemoryWeight {
-  if (!value) {
-    return "medium";
-  }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === "high") {
-    return "high";
-  }
-  if (normalized === "low") {
-    return "low";
-  }
-  return "medium";
 }
 
 async function fetchUrlSnippet(url: string): Promise<string> {
@@ -2579,59 +1594,6 @@ function loadRuntimeBundle(params: {
   return migrated;
 }
 
-function extractSectionFirstBullet(markdown: string, heading: string): string | undefined {
-  const pattern = new RegExp(
-    `##\\s*${escapeRegExp(heading)}[\\s\\S]*?(?=\\n##\\s|$)`,
-  );
-  const section = pattern.exec(markdown)?.[0];
-  if (!section) {
-    return undefined;
-  }
-  const bullet = section
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith("- "));
-  return bullet?.replace(/^-+\s*/, "").trim();
-}
-
-function extractStateKeywords(state: string): string | undefined {
-  const pattern = /##\s*当前阶段关键词[\s\S]*?(?=\n##\s|$)/.exec(state)?.[0];
-  if (!pattern) {
-    return undefined;
-  }
-  const keywords = pattern
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.replace(/^-+\s*/, "").trim())
-    .filter(Boolean)
-    .slice(0, 3);
-  if (keywords.length === 0) {
-    return undefined;
-  }
-  return `近期关键词：${keywords.join(" / ")}`;
-}
-
-function derivePreviewFromPersonaState(persona: string, state: string): PreviewCard {
-  return {
-    summary:
-      extractSectionFirstBullet(persona, "一句话画像") ??
-      DEFAULT_PREVIEW.summary,
-    speakingFeel:
-      extractSectionFirstBullet(persona, "对话风格（像真人，而不是说明书）") ??
-      DEFAULT_PREVIEW.speakingFeel,
-    decisionFocus:
-      extractSectionFirstBullet(persona, "决策习惯") ??
-      DEFAULT_PREVIEW.decisionFocus,
-    stressShift:
-      extractSectionFirstBullet(persona, "冲突与压力") ??
-      DEFAULT_PREVIEW.stressShift,
-    currentState:
-      extractStateKeywords(state) ??
-      DEFAULT_PREVIEW.currentState,
-  };
-}
-
 function parseYesNo(value?: string): boolean | undefined {
   if (!value) {
     return undefined;
@@ -2644,6 +1606,27 @@ function parseYesNo(value?: string): boolean | undefined {
     return false;
   }
   return undefined;
+}
+
+function hasRelationshipChanged(
+  current: string[],
+  next: string[],
+): boolean {
+  return current.join("|") !== next.join("|");
+}
+
+function pickPreviewValue(candidate: string, fallback: string): string {
+  const normalized = candidate.trim();
+  if (!normalized) {
+    return fallback;
+  }
+  if (normalized.startsWith("未提取到")) {
+    return fallback;
+  }
+  if (normalized.startsWith("Missing")) {
+    return fallback;
+  }
+  return normalized;
 }
 
 function resolveConfirmMode(
@@ -2819,99 +1802,6 @@ async function resolveRelationships(args: Record<string, string>): Promise<{
     relationships: fallback,
     activeRelationships: fallback,
   };
-}
-
-function parseDateTimeInput(input?: string): {
-  year: number;
-  month: number;
-  day: number;
-  hour: number;
-  minute: number;
-  second: number;
-  display: string;
-} {
-  if (!input || !input.trim()) {
-    const now = new Date();
-    return {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      day: now.getDate(),
-      hour: now.getHours(),
-      minute: now.getMinutes(),
-      second: now.getSeconds(),
-      display: `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}-${`${now.getDate()}`.padStart(2, "0")} ${`${now.getHours()}`.padStart(2, "0")}:${`${now.getMinutes()}`.padStart(2, "0")}:${`${now.getSeconds()}`.padStart(2, "0")}`,
-    };
-  }
-  const raw = input.trim();
-
-  const directDate = new Date(raw.includes("T") ? raw : raw.replace(" ", "T"));
-  if (!Number.isNaN(directDate.getTime())) {
-    return {
-      year: directDate.getFullYear(),
-      month: directDate.getMonth() + 1,
-      day: directDate.getDate(),
-      hour: directDate.getHours(),
-      minute: directDate.getMinutes(),
-      second: directDate.getSeconds(),
-      display: `${directDate.getFullYear()}-${`${directDate.getMonth() + 1}`.padStart(2, "0")}-${`${directDate.getDate()}`.padStart(2, "0")} ${`${directDate.getHours()}`.padStart(2, "0")}:${`${directDate.getMinutes()}`.padStart(2, "0")}:${`${directDate.getSeconds()}`.padStart(2, "0")}`,
-    };
-  }
-
-  const [datePart, timePart] = raw.split(/\s+/, 2);
-  const date = normalizeDateInput(datePart);
-  validateDate(date);
-  const time = timePart ? normalizeTimeInput(timePart) : "12:00";
-  validateTime(time);
-  const [year, month, day] = date.split("-").map((x) => Number.parseInt(x, 10));
-  const [hour, minute] = time.split(":").map((x) => Number.parseInt(x, 10));
-  return {
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    second: 0,
-    display: `${date} ${time}:00`,
-  };
-}
-
-function buildFlowEnergySummary(tenGods: string[], lang: OutputLanguage = "zh"): string {
-  const count = (targets: string[]) =>
-    tenGods.filter((item) => targets.includes(item)).length;
-  const guansha = count(["正官", "七杀"]);
-  const shishang = count(["食神", "伤官"]);
-  const yinxing = count(["正印", "偏印"]);
-  const caixing = count(["正财", "偏财"]);
-  const bijie = count(["比肩", "劫财"]);
-
-  if (guansha >= 2) {
-    return lang === "en"
-      ? "Officer/Killer energy is strong; responsibility and pressure are higher today, so stabilize boundaries first."
-      : "官杀能量偏强，今天更容易感到责任和压力，适合先定边界再推进。";
-  }
-  if (shishang >= 2) {
-    return lang === "en"
-      ? "Output-star energy is strong; expression and visibility are favored today."
-      : "食伤能量偏强，今天表达欲和输出欲更高，适合沟通、创作和公开表达。";
-  }
-  if (caixing >= 2) {
-    return lang === "en"
-      ? "Wealth-star energy is strong; today favors pragmatic ROI and resource execution."
-      : "财星能量偏强，今天更务实，容易关注投入产出、资源与结果兑现。";
-  }
-  if (yinxing >= 2) {
-    return lang === "en"
-      ? "Resource-star energy is strong; better for reflection, information completion, and strategy calibration."
-      : "印星能量偏强，今天更倾向思考与复盘，适合补信息、做策略校准。";
-  }
-  if (bijie >= 2) {
-    return lang === "en"
-      ? "Peer-star energy is strong; initiative is high, suitable for self-led decisions."
-      : "比劫能量偏强，今天主观能动性更高，适合自己主导关键决策。";
-  }
-  return lang === "en"
-    ? "Today's energy is relatively balanced; follow planned rhythm and avoid emotional over-commitment."
-    : "今日能量相对均衡，建议按既定节奏推进，避免情绪化加码。";
 }
 
 function sameDay(a: string, b: string): boolean {
@@ -3145,6 +2035,10 @@ function buildPersonaSkillFile(params: {
     params.memoryPins && params.memoryPins.length > 0
       ? params.memoryPins.map((x) => `- [PIN/${x.type}] ${x.content}`).join("\n")
       : "- 暂无固化记忆";
+  const analyzerPromptSummary = summarizePromptForSkill(readPromptTemplate("bazi_analyzer.md"));
+  const personaPromptSummary = summarizePromptForSkill(readPromptTemplate("persona_builder.md"));
+  const statePromptSummary = summarizePromptForSkill(readPromptTemplate("state_builder.md"));
+  const skillPromptSummary = summarizePromptForSkill(readPromptTemplate("skill_builder.md"));
 
   return `---
 name: ${params.slug}
@@ -3166,6 +2060,26 @@ ${params.persona}
 ## Current State Modifier
 
 ${params.state}
+
+## Prompt Workflow (Agent-first)
+
+### Step 1 · Bazi Analyzer
+${analyzerPromptSummary}
+
+### Step 2 · Persona Builder
+${personaPromptSummary}
+
+### Step 3 · State Builder
+${statePromptSummary}
+
+### Step 4 · Skill Builder
+${skillPromptSummary}
+
+### Workflow Inputs (Runtime)
+- 关系上下文：${relationshipLabel}
+- 精度模式：${params.meta.accuracy_mode}
+- 实时记忆数量：${params.memory.length}
+- Reality Anchors：${realityFacts.length > 0 ? realityFacts.join(" / ") : "暂无"}
 
 ## Bazi Evidence
 
@@ -3369,20 +2283,16 @@ function printWelcome(args: Record<string, string>): void {
   const launchProfiles = buildLaunchProfiles(baseDir);
   const commonCommands = uiLang === "en"
     ? [
-        "Common commands:",
-        "- /bazi-persona create",
-        "- /bazi-persona list",
-        "- /bazi-persona {id}",
-        "- /bazi-persona cheatsheet {id}",
+        "How to use:",
+        "- /bazi-persona + natural language",
         "- /bazi-persona help",
+        "- /bazi-persona agent enable",
       ]
     : [
-        "常用命令：",
-        "- /bazi-persona create",
-        "- /bazi-persona list",
-        "- /bazi-persona {id}",
-        "- /bazi-persona cheatsheet {id}",
+        "使用方式：",
+        "- /bazi-persona + 自然语言",
         "- /bazi-persona help",
+        "- /bazi-persona agent enable",
       ];
   process.stdout.write(
     [
@@ -3427,7 +2337,8 @@ async function createPersona(args: Record<string, string>): Promise<void> {
 
   const chart = await resolveChartForCreate(args);
   const createContext = collectCreateNarrativeContext(args);
-  const generatedPack = buildPersonaFromChart({
+  const renderMode = resolveRenderMode(args);
+  const generatedPack = (renderMode === "agent" ? buildAgentFirstPersonaPack : buildPersonaFromChart)({
     name,
     relationships: relationshipSetup.relationships,
     activeRelationships: relationshipSetup.activeRelationships,
@@ -3435,15 +2346,18 @@ async function createPersona(args: Record<string, string>): Promise<void> {
     chart,
     supplementalFacts: createContext.personaFacts,
   });
-  const persona = readMaybeFile(args["persona-file"]) || generatedPack.persona;
-  const state = readMaybeFile(args["state-file"]) || generatedPack.state;
+  const personaOverride = readMaybeFile(args["persona-file"]);
+  const stateOverride = readMaybeFile(args["state-file"]);
+  const persona = personaOverride || generatedPack.persona;
+  const state = stateOverride || generatedPack.state;
   const accuracyMode = detectAccuracyMode(chart);
+  const derivedPreview = derivePreviewFromPersonaState(persona, state);
   const preview = {
-    summary: args["preview-summary"] ?? generatedPack.preview.summary,
-    speakingFeel: args["preview-speaking"] ?? generatedPack.preview.speakingFeel,
-    decisionFocus: args["preview-decision"] ?? generatedPack.preview.decisionFocus,
-    stressShift: args["preview-stress"] ?? generatedPack.preview.stressShift,
-    currentState: args["preview-current"] ?? generatedPack.preview.currentState,
+    summary: args["preview-summary"] ?? pickPreviewValue(derivedPreview.summary, generatedPack.preview.summary),
+    speakingFeel: args["preview-speaking"] ?? pickPreviewValue(derivedPreview.speakingFeel, generatedPack.preview.speakingFeel),
+    decisionFocus: args["preview-decision"] ?? pickPreviewValue(derivedPreview.decisionFocus, generatedPack.preview.decisionFocus),
+    stressShift: args["preview-stress"] ?? pickPreviewValue(derivedPreview.stressShift, generatedPack.preview.stressShift),
+    currentState: args["preview-current"] ?? pickPreviewValue(derivedPreview.currentState, generatedPack.preview.currentState),
   };
   process.stdout.write(`${formatPreviewCard(preview, uiLang)}\n`);
   const confirmed = await askWriteConfirmation(
@@ -3551,8 +2465,8 @@ async function createPersona(args: Record<string, string>): Promise<void> {
       pickLangLine(uiLang, `触发词：/${slug}`, `Trigger: /${slug}`),
       pickLangLine(
         uiLang,
-        "常用命令：/bazi-persona create | /bazi-persona list | /bazi-persona help",
-        "Common commands: /bazi-persona create | /bazi-persona list | /bazi-persona help",
+        "入口：/bazi-persona（直接说自然语言即可）",
+        "Entrypoint: /bazi-persona (natural language first)",
       ),
       pickLangLine(uiLang, `已自动切换到角色模式：${name}`, `Auto-switched to persona mode: ${name}`),
       pickLangLine(
@@ -3596,8 +2510,8 @@ async function createPersona(args: Record<string, string>): Promise<void> {
         : []),
       pickLangLine(
         uiLang,
-        `如需一键开启 Claude/OpenClaw 便捷启动：npm run bazi:agent:enable -- --slug ${slug}`,
-        `To enable one-command startup in Claude/OpenClaw: npm run bazi:agent:enable -- --slug ${slug}`,
+        `如需一键开启 Claude/OpenClaw/Hermes 便捷启动：npm run bazi:agent:enable -- --slug ${slug}`,
+        `To enable one-command startup in Claude/OpenClaw/Hermes: npm run bazi:agent:enable -- --slug ${slug}`,
       ),
       pickLangLine(uiLang, "你下一句直接说需求即可，我会持续按该人格回应。", "Send your next message naturally and I'll stay in persona."),
     ].join("\n") + "\n",
@@ -3664,6 +2578,11 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     args,
     runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"],
   );
+  const previousRelationships = runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"];
+  const previousActiveRelationships = runtime.meta.active_relationships ?? previousRelationships;
+  const relationshipChanged =
+    hasRelationshipChanged(previousRelationships, relationshipSet.relationships) ||
+    hasRelationshipChanged(previousActiveRelationships, relationshipSet.activeRelationships);
   const runtimeMode = resolveStateRuntime(runtime.state.runtime, args);
   const uiLang = resolveOutputLanguage({ args, meta: runtime.meta });
 
@@ -3695,12 +2614,6 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
 
   const backupName = backupPersona(baseDir, slug, "update");
 
-  if (personaPatch) {
-    currentPersona = `${currentPersona.trim()}\n\n<!-- 增量更新 ${nowIso()} -->\n${personaPatch}\n`.trim();
-  }
-  if (statePatch) {
-    currentState = `${currentState.trim()}\n\n<!-- 增量更新 ${nowIso()} -->\n${statePatch}\n`.trim();
-  }
   if (correction) {
     currentMemory = [
       ...currentMemory,
@@ -3804,6 +2717,58 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     currentMemoryPins = currentMemoryPins.filter((x) => !x.content.includes(forgetKeyword));
   }
 
+  const hasDataDrivenChanges =
+    Boolean(correction) ||
+    Boolean(memoryInput) ||
+    Boolean(messageText) ||
+    Boolean(incomingChart) ||
+    Boolean(chatText) ||
+    Boolean(textMaterial) ||
+    urls.length > 0 ||
+    Boolean(forgetKeyword) ||
+    relationshipChanged;
+  const regenPersonaFlag =
+    parseYesNo(args["regen-persona"]) ??
+    parseYesNo(args["persona-regen"]);
+  const shouldRegeneratePersona =
+    regenPersonaFlag ?? (!personaPatch && !statePatch && hasDataDrivenChanges);
+  let engineNote = pickLangLine(uiLang, "人格更新方式：仅增量 patch", "Persona update mode: patch only");
+  if (shouldRegeneratePersona) {
+    const supplementalFacts = Array.from(
+      new Set(
+        [
+          ...pickRealityFactsFromMemory(currentMemory),
+          ...currentMemory
+            .filter((x) => x.type === "style_pattern")
+            .map((x) => x.content.trim()),
+        ].filter(Boolean),
+      ),
+    ).slice(0, 14);
+    const renderMode = resolveRenderMode(args);
+    const regeneratedBase = (renderMode === "agent" ? buildAgentFirstPersonaPack : buildPersonaFromChart)({
+      name: runtime.meta.name,
+      relationships: relationshipSet.relationships,
+      activeRelationships: relationshipSet.activeRelationships,
+      gender: runtime.meta.gender,
+      chart: currentChart,
+      supplementalFacts,
+    });
+    currentPersona = regeneratedBase.persona;
+    currentState = regeneratedBase.state;
+    engineNote = pickLangLine(
+      uiLang,
+      "人格更新方式：规则重建（融合新增资料）",
+      "Persona update mode: rules-based rebuild with new materials",
+    );
+  }
+
+  if (personaPatch) {
+    currentPersona = `${currentPersona.trim()}\n\n<!-- 增量更新 ${nowIso()} -->\n${personaPatch}\n`.trim();
+  }
+  if (statePatch) {
+    currentState = `${currentState.trim()}\n\n<!-- 增量更新 ${nowIso()} -->\n${statePatch}\n`.trim();
+  }
+
   const memoryCorrectionCount = [
     ...(correction ? [correction] : []),
     ...(memoryInput && memoryType === "correction" ? [memoryInput] : []),
@@ -3900,6 +2865,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
   process.stdout.write(
     [
       pickLangLine(uiLang, "更新成功。", "Updated successfully."),
+      engineNote,
       pickLangLine(uiLang, `已备份版本：${backupName}`, `Backup snapshot: ${backupName}`),
       pickLangLine(uiLang, `当前版本：${nextMeta.version}`, `Current version: ${nextMeta.version}`),
     ].join("\n") + "\n",
@@ -4319,6 +3285,8 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     ];
   } else if (uiLang === "en") {
     const voice =
+      extractSectionFirstBullet(runtime.core.persona_markdown, "1. 典型说话风格") ??
+      extractSectionFirstBullet(runtime.core.persona_markdown, "3. 沟通风格") ??
       extractSectionFirstBullet(runtime.core.persona_markdown, "对话风格（像真人）") ??
       "Lead with the point, then the action";
     body = [
@@ -4370,6 +3338,8 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     ];
   } else {
     const voice =
+      extractSectionFirstBullet(runtime.core.persona_markdown, "1. 典型说话风格") ??
+      extractSectionFirstBullet(runtime.core.persona_markdown, "3. 沟通风格") ??
       extractSectionFirstBullet(runtime.core.persona_markdown, "对话风格（像真人）") ??
       "先说重点，再给动作";
     body = [
@@ -4425,7 +3395,7 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
       "",
       pickLangLine(
         uiLang,
-        "说明：Cheatsheet 开启后可正常聊天，只有命中特定问题才切对应模板。",
+        "说明：Cheatsheet 开启后可正常聊天，只有匹配到特定意图才切对应模板。",
         "Note: Cheatsheet mode keeps normal chat; it only switches templates for matched intents.",
       ),
     ].join("\n") + "\n",
@@ -4556,35 +3526,28 @@ function printCommandHelp(args: Record<string, string>): void {
     const lines = [
       "Bazi Persona Help",
       "",
-      "Common commands",
-      "- /bazi-persona create",
-      "- /bazi-persona list",
-      "- /bazi-persona {id}",
-      "- /bazi-persona update {id}",
-      "- /bazi-persona cheatsheet {id}",
-      "- /bazi-persona flow {id}",
-      "- /bazi-persona calendar [date]",
+      "User entrypoint (single):",
+      "- /bazi-persona + natural language",
+      "- Example: Create persona Xiaomei, female, 1999-08-12 15:30, Shanghai, coworker",
+      "- Example: Update xiaomei with this new fact: got promoted this month",
+      "- Example: Show xiaomei flow status this week",
+      "- Example: Check today's Chinese calendar",
+      "",
+      "Ops commands (advanced):",
+      "- /bazi-persona help",
       "- /bazi-persona agent enable",
+      "- /bazi-persona agent sync [claude|openclaw|hermes|all]",
       "- /bazi-persona agent list",
-      ];
+      "- /bazi-persona agent remove",
+    ];
     if (profileText) {
       lines.push("", profileText);
     }
     lines.push(
       "",
-      "All commands",
-      "- /bazi-persona help",
-      "- /bazi-persona rollback {id} {version}",
-      "- /bazi-persona delete {id}",
-      "- /bazi-persona compat {idA} {idB}",
-      "- /bazi-persona memory {id}",
-      "- /bazi-persona ingest {id}",
-      "- /bazi-persona agent sync [claude|openclaw|both]",
-      "- /bazi-persona agent remove",
-      "",
-      "CLI bridge examples",
+      "CLI bridge examples (ops only):",
       "- npm run bazi -- --action agent --op enable",
-      "- npm run bazi -- --action agent --op sync --target both",
+      "- npm run bazi -- --action agent --op sync --target all",
       "- npm run bazi -- --action agent --op list",
       "- npm run bazi -- --action agent --op remove --confirm DELETE",
     );
@@ -4594,52 +3557,252 @@ function printCommandHelp(args: Record<string, string>): void {
   const lines = [
     "八字人格帮助",
     "",
-    "常用命令",
-    "- /bazi-persona create",
-    "- /bazi-persona list",
-    "- /bazi-persona {id}",
-    "- /bazi-persona update {id}",
-    "- /bazi-persona cheatsheet {id}",
-    "- /bazi-persona flow {id}",
-    "- /bazi-persona calendar [date]",
+    "用户入口（单入口）",
+    "- /bazi-persona + 自然语言",
+    "- 示例：帮我创建八字人格：小美，女，1999年8月12日15:30，上海，同事",
+    "- 示例：帮我更新 xiaomei，她最近升职了",
+    "- 示例：看下 xiaomei 最近状态",
+    "- 示例：今天黄历怎么样",
+    "",
+    "运维命令（高级）",
+    "- /bazi-persona help",
     "- /bazi-persona agent enable",
+    "- /bazi-persona agent sync [claude|openclaw|hermes|all]",
     "- /bazi-persona agent list",
+    "- /bazi-persona agent remove",
   ];
   if (profileText) {
     lines.push("", profileText);
   }
   lines.push(
     "",
-    "全部命令",
-    "- /bazi-persona help",
-    "- /bazi-persona rollback {id} {version}",
-    "- /bazi-persona delete {id}",
-    "- /bazi-persona compat {idA} {idB}",
-    "- /bazi-persona memory {id}",
-    "- /bazi-persona ingest {id}",
-    "- /bazi-persona agent sync [claude|openclaw|both]",
-    "- /bazi-persona agent remove",
-    "",
-    "CLI 对应写法",
+    "CLI 对应写法（运维）",
     "- npm run bazi -- --action agent --op enable",
-    "- npm run bazi -- --action agent --op sync --target both",
+    "- npm run bazi -- --action agent --op sync --target all",
     "- npm run bazi -- --action agent --op list",
     "- npm run bazi -- --action agent --op remove --confirm DELETE",
   );
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 
+function inferAgentOpFromInput(text: string): "enable" | "sync" | "list" | "remove" {
+  const lower = text.toLowerCase();
+  if (/remove|delete|移除|删除/.test(lower)) {
+    return "remove";
+  }
+  if (/list|show|查看|列表/.test(lower)) {
+    return "list";
+  }
+  if (/sync|同步/.test(lower)) {
+    return "sync";
+  }
+  return "enable";
+}
+
+function extractDateLikeToken(text: string): string | undefined {
+  const full = text.match(/(\d{4})[年\-/.](\d{1,2})[月\-/.](\d{1,2})/u);
+  if (full) {
+    const y = Number.parseInt(full[1], 10);
+    const m = Number.parseInt(full[2], 10);
+    const d = Number.parseInt(full[3], 10);
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+      return `${y}-${`${m}`.padStart(2, "0")}-${`${d}`.padStart(2, "0")}`;
+    }
+  }
+  const short = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/u);
+  if (!short) {
+    return undefined;
+  }
+  return `${short[1]}-${short[2].padStart(2, "0")}-${short[3].padStart(2, "0")}`;
+}
+
+function extractNameFromInput(text: string): string | undefined {
+  const cleaned = text.replace(/^.*?[：:]/u, "").trim();
+  if (!cleaned) {
+    return undefined;
+  }
+  const first = cleaned.split(/[，,\s]+/u).map((x) => x.trim()).find(Boolean);
+  if (!first || /创建|人格|八字|帮我|please|create/iu.test(first)) {
+    return undefined;
+  }
+  return first;
+}
+
+function extractGenderFromInput(text: string): string | undefined {
+  if (/\bmale\b|男/iu.test(text)) {
+    return "男";
+  }
+  if (/\bfemale\b|女/iu.test(text)) {
+    return "女";
+  }
+  return undefined;
+}
+
+function extractTimeFromInput(text: string): string | undefined {
+  const hm = text.match(/(\d{1,2})[:：点时](\d{1,2})/u);
+  if (hm) {
+    const h = Number.parseInt(hm[1], 10);
+    const m = Number.parseInt(hm[2], 10);
+    if (Number.isFinite(h) && Number.isFinite(m)) {
+      return `${`${h}`.padStart(2, "0")}:${`${m}`.padStart(2, "0")}`;
+    }
+  }
+  const half = text.match(/(上午|下午)?\s*(\d{1,2})点半/u);
+  if (half) {
+    let h = Number.parseInt(half[2], 10);
+    if (half[1] === "下午" && h < 12) {
+      h += 12;
+    }
+    return `${`${h}`.padStart(2, "0")}:30`;
+  }
+  return undefined;
+}
+
+function extractLocationFromInput(text: string): string | undefined {
+  const parts = text
+    .split(/[，,]/u)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  for (const part of parts) {
+    if (/创建|人格|八字|更新|状态|黄历|help|create|update/iu.test(part)) {
+      continue;
+    }
+    if (/\d{4}/u.test(part) || /男|女|male|female/iu.test(part)) {
+      continue;
+    }
+    if (/同事|老板|伴侣|前任|朋友|家人|自己|名人|coworker|friend|partner|boss|family|ex/iu.test(part)) {
+      continue;
+    }
+    if (part.length >= 2 && part.length <= 20) {
+      return part.replace(/[人]$/u, "");
+    }
+  }
+  return undefined;
+}
+
+function extractRelationFromInput(text: string): string | undefined {
+  const relationHints = ["同事", "老板", "上级", "下属", "伴侣", "前任", "朋友", "家人", "自己", "名人", "同学", "客户", "partner", "friend", "coworker", "boss", "family", "ex"];
+  const hit = relationHints.find((hint) => text.toLowerCase().includes(hint.toLowerCase()));
+  return hit;
+}
+
+function hydrateCreateArgsFromInput(args: Record<string, string>, input: string): Record<string, string> {
+  const next = { ...args };
+  const parts = input
+    .split(/[，,]/u)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const fromPrefix = extractNameFromInput(input);
+  const fromParts = parts.length > 0 ? parts[0].replace(/^.*?[：:]/u, "").trim() : undefined;
+  next.name = next.name ?? fromPrefix ?? fromParts ?? "";
+  next.gender = next.gender ?? extractGenderFromInput(input) ?? "";
+  next["birth-date"] = next["birth-date"] ?? extractDateLikeToken(input) ?? "";
+  next["birth-time"] = next["birth-time"] ?? extractTimeFromInput(input) ?? "";
+  next["birth-location"] = next["birth-location"] ?? extractLocationFromInput(input) ?? "";
+  if (!next["birth-location"] && parts.length >= 4) {
+    next["birth-location"] = parts[3].replace(/[人]$/u, "").trim();
+  }
+  if (!next["birth-location"]) {
+    next["birth-location"] = "未知";
+  }
+  next.relation = next.relation ?? extractRelationFromInput(input) ?? "";
+  return next;
+}
+
+function attachSlugFromInput(args: Record<string, string>, input: string): Record<string, string> {
+  if (args.slug?.trim()) {
+    return args;
+  }
+  const index = buildIndex(resolveBaseDir(args));
+  const lowered = input.toLowerCase();
+  const matched = index.find((item) => lowered.includes(item.slug.toLowerCase()) || lowered.includes(item.name.toLowerCase()));
+  if (!matched) {
+    return args;
+  }
+  return {
+    ...args,
+    slug: matched.slug,
+  };
+}
+
+async function orchestrateAction(args: Record<string, string>): Promise<void> {
+  const input = (args.input ?? args.message ?? args.query ?? "").trim();
+  if (!input) {
+    printWelcome(args);
+    return;
+  }
+  const lower = input.toLowerCase();
+
+  if (/help|帮助|怎么用|usage/.test(lower)) {
+    printCommandHelp(args);
+    return;
+  }
+  if (/agent|claude|openclaw|hermes|同步/.test(lower) && /(enable|sync|list|remove|开启|启用|同步|查看|删除|移除)/.test(lower)) {
+    await agentOps({
+      ...args,
+      op: args.op ?? inferAgentOpFromInput(input),
+    });
+    return;
+  }
+  if (/calendar|黄历|万年历|节气/.test(lower)) {
+    await queryCalendarStatus({
+      ...args,
+      at: args.at ?? extractDateLikeToken(input),
+    });
+    return;
+  }
+  if (/list|我有哪些人格|查看人格|角色列表/.test(lower)) {
+    listPersonas(args);
+    return;
+  }
+  if (/cheatsheet|作弊模式/.test(lower)) {
+    await cheatsheetPersona(attachSlugFromInput(args, input));
+    return;
+  }
+  if (/flow|状态|流年|运势|近期/.test(lower)) {
+    await queryFlowStatus(attachSlugFromInput(args, input));
+    return;
+  }
+  if (/update|更新|补充|修正|更正/.test(lower)) {
+    await updatePersona(attachSlugFromInput(args, input));
+    return;
+  }
+  if (/create|创建|生成|新建/.test(lower)) {
+    await createPersona(hydrateCreateArgsFromInput(args, input));
+    return;
+  }
+
+  process.stdout.write(
+    [
+      pickLangLine(
+        resolveOutputLanguage({ args, message: input }),
+        "我已收到你的请求。请继续用自然语言描述，并补充必要字段（如姓名、生日、地点、关系）。",
+        "Request received. Keep describing it in natural language and include required fields (name, birth date, location, relation).",
+      ),
+      pickLangLine(
+        resolveOutputLanguage({ args, message: input }),
+        "你也可以说：帮我创建八字人格：小美，女，1999年8月12日15:30，上海，同事。",
+        "You can also say: Create a persona for Xiaomei, female, 1999-08-12 15:30, Shanghai, coworker.",
+      ),
+    ].join("\n") + "\n",
+  );
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv);
-  const action = args.action ?? "welcome";
-  if (!["welcome", "create", "update", "list", "delete", "rollback", "flow", "calendar", "ingest", "cheatsheet", "compat", "memory", "agent", "help"].includes(action)) {
+  const action = args.action ?? "orchestrate";
+  if (!["orchestrate", "welcome", "create", "update", "list", "delete", "rollback", "flow", "calendar", "ingest", "cheatsheet", "compat", "memory", "agent", "help"].includes(action)) {
     throw new Error(
       [
         "缺少或不支持的 action。",
-        "可用值：welcome / create / update / list / delete / rollback / flow / calendar / ingest / cheatsheet / compat / memory / agent / help",
-        "示例：使用 /bazi-persona list 查看已创建人格。",
+        "可用值：orchestrate / welcome / create / update / list / delete / rollback / flow / calendar / ingest / cheatsheet / compat / memory / agent / help",
+        "示例：npm run bazi -- --action orchestrate --input \"帮我创建八字人格...\"",
       ].join("\n"),
     );
+  }
+  if (action === "orchestrate") {
+    await orchestrateAction(args);
+    return;
   }
   if (action === "welcome") {
     printWelcome(args);

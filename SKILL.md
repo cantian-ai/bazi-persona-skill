@@ -19,26 +19,21 @@ allowed-tools: Bash(npm run bazi *), Bash(npm run bazi:*), Bash(node dist/core/s
 6. 创建流程必须尽量用单次本地命令完成，避免让用户反复授权。
 7. 非必要不读取额外 markdown 文件；优先直接执行单入口命令。
 8. 用户可用任意语言输入；默认跟随用户语言回复，必要时中英双语并列说明。
-9. 若用户需要在 Claude Code / OpenClaw 便捷复用人格，优先引导执行 agent 同步命令。
+9. 若用户需要在 Claude Code / OpenClaw / Hermes 便捷复用人格，优先引导执行 agent 同步命令。
 
 ## 常用命令
 
-统一入口：`/bazi-persona`
+统一入口（用户侧）：`/bazi-persona`
 
-- `/bazi-persona create`：创建新人格
-- `/bazi-persona list`：查看所有人格
-- `/bazi-persona {id}`：直接进入该人格对话（例如 `/bazi-persona xiao-mei`）
-- `/bazi-persona update {id}`：补充资料并更新
-- `/bazi-persona cheatsheet {id}`：开启/使用作弊模式
-- `/bazi-persona flow {id}`：查询当前时运状态
-- `/bazi-persona calendar [date]`：查询万年历/黄历（节气、宜忌、冲煞）
-- `/bazi-persona agent enable`：一键启用 Claude/OpenClaw 角色同步
+- `/bazi-persona` + 自然语言：自动识别创建 / 更新 / 状态 / 关系 / 黄历请求
+- `/bazi-persona help`：查看使用说明
+- `/bazi-persona agent enable`：一键启用 Claude/OpenClaw/Hermes 角色同步
 - `/bazi-persona agent list`：查看同步目标与角色表
 
 查看全部命令：
 
 - `/bazi-persona help`
-- `/bazi-persona agent sync [claude|openclaw|both]`
+- `/bazi-persona agent sync [claude|openclaw|hermes|all]`
 - `/bazi-persona agent remove`
 
 规则：对外统一使用 `/bazi-persona ...`，不再暴露历史分散命令。
@@ -50,6 +45,7 @@ Agent 同步命令（平台集成）：
 - `npm run bazi:agent:sync`
 - `npm run bazi:agent:sync:claude`
 - `npm run bazi:agent:sync:openclaw`
+- `npm run bazi:agent:sync:hermes`
 
 术语说明（对用户）：
 - `ID` 为对外显示名，内部参数仍为 `slug`（兼容历史命令）。
@@ -244,9 +240,9 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 ### 时运查询（新增）
 
-命令：
+触发方式（用户侧）：
 
-- `/bazi-persona flow {id} {datetime?}`
+- `/bazi-persona` + “看下 xxx 最近状态 / 今天状态 / 某时点状态”
 
 功能要求：
 
@@ -257,9 +253,9 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 ### Cheatsheet 模式（新增）
 
-命令：
+触发方式（用户侧）：
 
-- `/bazi-persona cheatsheet {id}`（开启后可持续使用）
+- `/bazi-persona` + “打开作弊模式 / 关闭作弊模式 / 查看作弊模式状态”
 
 行为：
 
@@ -268,7 +264,7 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 3. 当用户问题命中“状态/合盘/经历/未来”时，自动切到对应模板回答。
 4. 消息满意度指示按配置显示，可开关。
 
-## 存储架构（v2）
+## 存储架构（v2+）
 
 1. 对外：`SKILL.md` 是唯一主文件（用户可读、可分发）。
 2. 对内：`{slug}/.runtime/` 维护结构化数据：
@@ -279,6 +275,7 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
    - `memory.log.jsonl`
    - `memory.index.json`
    - `memory.pins.json`
+   - `platform.sync.state.json`
 3. 版本快照同时保存 `SKILL.md` 与 `.runtime/`，保证回滚一致性。
 
 ## 管理命令

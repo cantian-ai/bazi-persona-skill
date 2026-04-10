@@ -4,7 +4,7 @@ description: "Bazi persona toolkit with single entry command /bazi-persona. Use 
 argument-hint: "[id]"
 version: "0.1.0"
 user-invocable: true
-allowed-tools: Bash
+allowed-tools: Bash(npm run bazi *), Bash(npm run bazi:*), Bash(node dist/core/skill_writer.js *), Bash(node dist/runtime/agent_bridge.js *), Read, Write, Glob
 ---
 
 # 八字人格.skill 创建器 / Bazi Persona Skill Builder

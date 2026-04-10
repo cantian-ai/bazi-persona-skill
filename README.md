@@ -246,12 +246,12 @@ Bazi Persona Skill：
 
 在 Claude Code 或 OpenClaw 的对话框里粘贴这句话：
 
-> 帮我执行 `npx skills add cantian-ai/bazi-persona-skill --skill bazi-persona -a claude-code --copy -y` 安装八字人格技能
+> 帮我执行 `npx skills add cantian-ai/bazi-persona-skill --all` 安装八字人格技能
 
 或者你自己在终端执行：
 
 ```bash
-npx skills add cantian-ai/bazi-persona-skill --skill bazi-persona -a claude-code --copy -y
+npx skills add cantian-ai/bazi-persona-skill --all
 ```
 
 安装完成后，你的 AI 就拥有了八字人格能力。

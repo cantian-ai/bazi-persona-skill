@@ -1,6 +1,6 @@
 {
   "name": "bazi-persona-skill",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "八字人设技能工具 — 基于八字命理生成 AI persona",
   "type": "module",
   "main": "./dist/core/skill_writer.js",

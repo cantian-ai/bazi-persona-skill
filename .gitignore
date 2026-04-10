@@ -144,3 +144,8 @@ personas/
 # Local skill installation artifacts
 .agents/
 skills-lock.json
+
+# Local runtime / IDE / agent directories
+.claude/
+.skill-dist/
+skill-dist/

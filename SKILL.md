@@ -2,7 +2,7 @@
 name: bazi-persona
 description: "Bazi persona toolkit with single entry command /bazi-persona. Use /bazi-persona help to view all commands."
 argument-hint: "[id]"
-version: "2.0.0"
+version: "0.1.0"
 user-invocable: true
 allowed-tools: Bash
 ---

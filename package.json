@@ -3,6 +3,18 @@
   "version": "0.1.0",
   "description": "八字人设技能工具 — 基于八字命理生成 AI persona",
   "type": "module",
+  "main": "./dist/core/skill_writer.js",
+  "types": "./dist/core/skill_writer.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/core/skill_writer.js",
+      "types": "./dist/core/skill_writer.d.ts"
+    },
+    "./bazi": {
+      "import": "./dist/core/bazi_calc.js",
+      "types": "./dist/core/bazi_calc.d.ts"
+    }
+  },
   "bin": {
     "bazi": "./dist/core/skill_writer.js",
     "bazi-persona": "./dist/core/skill_writer.js"
@@ -25,10 +37,19 @@
     "八字",
     "命理"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cantian-ai/bazi-persona-skill.git"
+  },
+  "homepage": "https://github.com/cantian-ai/bazi-persona-skill#readme",
+  "bugs": {
+    "url": "https://github.com/cantian-ai/bazi-persona-skill/issues"
+  },
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "bazi": "node dist/core/skill_writer.js",
     "bazi:init": "node dist/core/skill_writer.js --action create",
     "bazi:update": "node dist/core/skill_writer.js --action update",
@@ -48,23 +69,9 @@
     "bazi:agent:sync:claude": "node dist/runtime/agent_bridge.js --action sync --target claude",
     "bazi:agent:sync:openclaw": "node dist/runtime/agent_bridge.js --action sync --target openclaw",
     "bazi:agent:remove": "node dist/runtime/agent_bridge.js --action remove --target both --confirm DELETE",
-    "create:persona": "tsx tools/core/skill_writer.ts --action create",
-    "update:persona": "tsx tools/core/skill_writer.ts --action update",
-    "list:persona": "tsx tools/core/skill_writer.ts --action list",
-    "rollback:persona": "tsx tools/runtime/version_manager.ts --action rollback",
-    "calc:bazi": "tsx tools/core/bazi_calc.ts",
-    "agent:enable": "tsx tools/runtime/agent_bridge.ts --action enable --target both",
-    "agent:list": "tsx tools/runtime/agent_bridge.ts --action list --target both",
-    "agent:sync": "tsx tools/runtime/agent_bridge.ts --action sync --target both",
-    "agent:sync:claude": "tsx tools/runtime/agent_bridge.ts --action sync --target claude",
-    "agent:sync:openclaw": "tsx tools/runtime/agent_bridge.ts --action sync --target openclaw",
-    "agent:remove": "tsx tools/runtime/agent_bridge.ts --action remove --target both --confirm DELETE",
-    "skills:list": "npx skills add . --list",
-    "install:codex": "npx skills add . --skill bazi-persona -a codex --copy -y",
-    "install:global:codex": "npx skills add . --skill bazi-persona -a codex -g --copy -y",
-    "install:all": "npx skills add . --skill bazi-persona -a codex -a claude-code -a cursor --copy -y",
-    "link:target": "bash -lc 'test -n \"$TARGET\" || { echo \"Usage: TARGET=/abs/path/to/project npm run link:target\"; exit 1; }; mkdir -p \"$TARGET/.agents/skills\"; ln -sfn \"$PWD\" \"$TARGET/.agents/skills/bazi-persona\"; echo \"linked -> $TARGET/.agents/skills/bazi-persona\"'",
-    "unlink:target": "bash -lc 'test -n \"$TARGET\" || { echo \"Usage: TARGET=/abs/path/to/project npm run unlink:target\"; exit 1; }; rm -rf \"$TARGET/.agents/skills/bazi-persona\"; echo \"removed -> $TARGET/.agents/skills/bazi-persona\"'"
+    "dev": "tsx tools/core/skill_writer.ts",
+    "dev:calc": "tsx tools/core/bazi_calc.ts",
+    "dev:agent": "tsx tools/runtime/agent_bridge.ts"
   },
   "dependencies": {
     "cantian-tymext": "^0.0.26",

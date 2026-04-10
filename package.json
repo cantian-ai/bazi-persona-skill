@@ -1,6 +1,6 @@
 {
   "name": "bazi-persona-skill",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "八字人格 — 基于八字命理生成有趣的AI人格",
   "type": "module",
   "main": "./dist/core/skill_writer.js",

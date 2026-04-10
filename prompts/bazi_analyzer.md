@@ -21,6 +21,7 @@
 7. 关系表现
 8. 金钱与风险偏好
 9. 禁止误读点
+10. MBTI 四轴映射（由八字推导，不是直接贴标签）
 
 ## 方法约束
 
@@ -29,6 +30,7 @@
 - 若 `accuracy_mode=missing_time_six_pillars`，必须降低确定性语气，并在结论中体现“待补时可精修”。
 - 不写成行业报告口吻，要像真实人物画像，可被对话直接使用。
 - 每条关键结论都要有“依据-推导-行为落点”，不能只给结论。
+- MBTI 必须给出 EI/SN/TF/JP 四轴分数和倾向置信度，并写明“仅为行为倾向镜像”。
 
 ## 输出格式
 
@@ -61,6 +63,15 @@
 
 ### Misread Prevention
 - ...
+
+### MBTI Mapping (Bazi → MBTI)
+- MBTI 倾向：{如 ISTJ}
+- EI：{score} / {confidence}
+- SN：{score} / {confidence}
+- TF：{score} / {confidence}
+- JP：{score} / {confidence}
+- 校准机制：{是否触发“阴印化官杀”}
+- 使用边界：MBTI 为行为倾向镜像，不做绝对人格定论。
 
 ### Evidence Mapping (Bazi → Persona)
 - 依据1：{例如：日主 + 五行强弱} → {推导的人格行为}

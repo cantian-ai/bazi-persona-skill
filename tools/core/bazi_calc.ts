@@ -17,7 +17,7 @@ export interface BaziCalcInput {
   gender: BaziGender;
   calendarType: CalendarType;
   sect: 1 | 2;
-  sourceCommand: "/create-bazi-persona" | "/update-bazi-persona";
+  sourceCommand: "/bazi-persona create" | "/bazi-persona update";
   trueSolarMode?: "auto" | "on" | "off";
   longitude?: number;
   dayRolloverHour?: number;
@@ -678,9 +678,9 @@ async function main(): Promise<void> {
       args.calendar === "lunar" || args.calendar === "农历" ? "lunar" : "solar",
     sect: args.sect === "1" ? 1 : 2,
     sourceCommand:
-      args.command === "/update-bazi-persona"
-        ? "/update-bazi-persona"
-        : "/create-bazi-persona",
+      args.command === "/bazi-persona update"
+        ? "/bazi-persona update"
+        : "/bazi-persona create",
     trueSolarMode:
       args["true-solar"] === "on" || args["true-solar"] === "off"
         ? (args["true-solar"] as "on" | "off")

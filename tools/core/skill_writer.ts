@@ -12,6 +12,10 @@ import {
   type CalendarType,
 } from "./bazi_calc.js";
 import {
+  inferMbtiFromBazi,
+  type MbtiInferenceProfile,
+} from "./bazi_mbti.js";
+import {
   ensureDir,
   ensureRequired,
   fileExists,
@@ -27,6 +31,7 @@ import {
   type Gender,
   type PersonaMeta,
 } from "../runtime/meta_updater.js";
+import { runAgentBridge } from "../runtime/agent_bridge.js";
 import { toSlug } from "../utils/slugify.js";
 import { backupPersona, rollbackPersona } from "../runtime/version_manager.js";
 import { promptOptionalText } from "../utils/confirm_prompt.js";
@@ -51,6 +56,16 @@ interface PersonaIndexItem {
   source_count: number;
 }
 
+interface LaunchProfileItem {
+  id: string;
+  name: string;
+  relationship: string;
+  bazi: string;
+  updated_at: string;
+}
+
+type RuntimeClient = "claude" | "openclaw" | "generic";
+
 type FiveElement = "木" | "火" | "土" | "金" | "水" | "未知";
 
 interface ChartLike {
@@ -63,6 +78,32 @@ interface ChartLike {
   current_year?: number;
   raw_bazi?: unknown;
   notes?: string[];
+}
+
+interface ChineseCalendarData {
+  公历: string;
+  农历: string;
+  干支日期: string;
+  生肖: string;
+  纳音: string;
+  农历节日?: string;
+  公历节日?: string;
+  节气: {
+    term: string;
+    afterDays: number;
+    nextTerm?: string;
+    beforeNextTermDays?: number;
+  };
+  二十八宿: string;
+  彭祖百忌: string;
+  喜神方位: string;
+  阳贵神方位: string;
+  阴贵神方位: string;
+  福神方位: string;
+  财神方位: string;
+  冲煞: string;
+  宜: string;
+  忌: string;
 }
 
 interface GeneratedPersonaPack {
@@ -643,10 +684,42 @@ function buildShiShenNotes(params: {
   return lines.join("\n");
 }
 
+function buildMbtiNotes(profile: MbtiInferenceProfile): string {
+  const topTenGodText =
+    profile.basis.top_ten_gods.length > 0
+      ? profile.basis.top_ten_gods
+          .map((item) => `${item.name} ${item.energy_percent.toFixed(1)}%`)
+          .join(" / ")
+      : "未提取到稳定十神能量分布";
+  const favorableText =
+    profile.basis.favorable_elements.length > 0
+      ? profile.basis.favorable_elements.join("、")
+      : "未明确";
+  const unfavorableText =
+    profile.basis.unfavorable_elements.length > 0
+      ? profile.basis.unfavorable_elements.join("、")
+      : "未明确";
+  const tendencyLines = Object.entries(profile.tendency_analysis).map(
+    ([label, value]) => `- ${label}：${value}`,
+  );
+
+  return [
+    `- 八字映射 MBTI：${profile.mbti_type}`,
+    `- 维度得分：EI ${profile.scores.ScoreEI}｜SN ${profile.scores.ScoreSN}｜TF ${profile.scores.ScoreTF}｜JP ${profile.scores.ScoreJP}`,
+    ...tendencyLines,
+    `- 依据链路：日主${profile.basis.day_master_stem ?? "未识别"}（${profile.basis.day_master_element}）｜日主强弱 ${profile.basis.day_master_strength}`,
+    `- 十神能量主轴：${topTenGodText}`,
+    `- 喜忌校准：喜 ${favorableText}｜忌 ${unfavorableText}`,
+    `- 校准机制：阴印化官杀 ${profile.basis.yin_transforms_guansha_calibration ? "已触发" : "未触发"}`,
+    "- 使用边界：MBTI 为行为倾向镜像，不代表绝对人格定论。",
+  ].join("\n");
+}
+
 function buildBaziKnowledgeNotes(params: {
   chart: ChartLike;
   primaryTenGod: string;
   currentLuckTenGod?: string;
+  mbtiProfile: MbtiInferenceProfile;
 }): string {
   const shishen = buildShiShenNotes({
     primaryTenGod: params.primaryTenGod,
@@ -654,6 +727,7 @@ function buildBaziKnowledgeNotes(params: {
   });
   const ganZhi = buildGanZhiPersonaNotes(params.chart);
   const shengXiao = buildShengXiaoNotes(params.chart);
+  const mbti = buildMbtiNotes(params.mbtiProfile);
   return [
     "- 影响权重：干支 = 十神 > 生肖（优先级从高到低）。",
     "",
@@ -665,6 +739,9 @@ function buildBaziKnowledgeNotes(params: {
     "",
     "### 生肖命中",
     shengXiao,
+    "",
+    "### MBTI 映射（由八字推导）",
+    mbti,
   ].join("\n");
 }
 
@@ -776,6 +853,50 @@ function interpretRelationEffects(items: string[], lang: OutputLanguage = "zh"):
     effects.push(lang === "en" ? "Relation impact is neutral; continue the existing plan." : "关系影响中性，按既定节奏推进。");
   }
   return effects.map((x) => `- ${x}`).join("\n");
+}
+
+async function queryChineseCalendar(params: {
+  year: number;
+  month: number;
+  day: number;
+}): Promise<ChineseCalendarData | undefined> {
+  try {
+    const { getChineseCalendar } = (await import("cantian-tymext")) as unknown as {
+      getChineseCalendar: (time: {
+        year: number;
+        month: number;
+        day: number;
+      }) => ChineseCalendarData;
+    };
+    return getChineseCalendar({
+      year: params.year,
+      month: params.month,
+      day: params.day,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function formatSolarTermInfo(
+  term: ChineseCalendarData["节气"] | undefined,
+  lang: OutputLanguage,
+): string {
+  if (!term) {
+    return lang === "en" ? "Solar term unavailable" : "节气信息暂不可用";
+  }
+  if (lang === "en") {
+    const next =
+      term.nextTerm && term.beforeNextTermDays !== undefined
+        ? `, next ${term.nextTerm} in ${term.beforeNextTermDays} day(s)`
+        : "";
+    return `${term.term} (day ${term.afterDays})${next}`;
+  }
+  const next =
+    term.nextTerm && term.beforeNextTermDays !== undefined
+      ? `，距${term.nextTerm}${term.beforeNextTermDays}天`
+      : "";
+  return `${term.term}（第${term.afterDays}天）${next}`;
 }
 
 async function buildFlowRelations(params: {
@@ -984,6 +1105,36 @@ async function buildFlowSnapshotMarkdown(params: {
   const solarDay = querySolar.getSolarDay();
   const solarMonth = solarDay.getSolarMonth();
   const solarYear = solarMonth.getSolarYear();
+  const calendar = await queryChineseCalendar({
+    year: queryAt.year,
+    month: queryAt.month,
+    day: queryAt.day,
+  });
+  const calendarLines = calendar
+    ? [
+        pickLangLine(
+          lang,
+          `- 黄历：宜 ${calendar.宜}｜忌 ${calendar.忌}`,
+          `- Almanac: Do ${calendar.宜} | Avoid ${calendar.忌}`,
+        ),
+        pickLangLine(
+          lang,
+          `- 节气：${formatSolarTermInfo(calendar.节气, lang)}`,
+          `- Solar term: ${formatSolarTermInfo(calendar.节气, lang)}`,
+        ),
+        pickLangLine(
+          lang,
+          `- 冲煞：${calendar.冲煞}`,
+          `- Clash/Omen: ${calendar.冲煞}`,
+        ),
+      ]
+    : [
+        pickLangLine(
+          lang,
+          "- 黄历：当前不可用（排盘可用，万年历模块未返回）。",
+          "- Almanac: unavailable for now (Bazi works, calendar module did not return data).",
+        ),
+      ];
 
   return [
     pickLangLine(lang, `- 查询时间：${queryAt.display}`, `- Query time: ${queryAt.display}`),
@@ -1018,6 +1169,7 @@ async function buildFlowSnapshotMarkdown(params: {
     pickLangLine(lang, `- 流月：${flowMonth}${monthTenGod ? `（${monthTenGod}）` : ""}`, `- Month flow: ${flowMonth}${monthTenGod ? ` (${monthTenGod})` : ""}`),
     pickLangLine(lang, `- 流日：${flowDay}${dayTenGod ? `（${dayTenGod}）` : ""}`, `- Day flow: ${flowDay}${dayTenGod ? ` (${dayTenGod})` : ""}`),
     pickLangLine(lang, `- 流时：${flowHour}${hourTenGod ? `（${hourTenGod}）` : ""}`, `- Hour flow: ${flowHour}${hourTenGod ? ` (${hourTenGod})` : ""}`),
+    ...calendarLines,
     pickLangLine(lang, `- 今日能量解读：${energySummary}`, `- Energy readout: ${energySummary}`),
     pickLangLine(lang, "- 刑冲合会联动：", "- Relation interactions:"),
     flowRelationLines,
@@ -1148,6 +1300,7 @@ function buildPersonaFromChart(params: {
   activeRelationships?: string[];
   gender: Gender;
   chart: ChartLike;
+  supplementalFacts?: string[];
 }): GeneratedPersonaPack {
   const dayMaster = params.chart.day_master;
   const element = inferElementFromDayMaster(dayMaster);
@@ -1167,12 +1320,35 @@ function buildPersonaFromChart(params: {
   const currentLuckText = describeLuckCycle(currentLuck);
   const yearlySummary = summarizeValue(params.chart.yearly_fortune);
   const shift = buildStateShift(primaryTenGod, currentLuckTenGod);
+  const supplementalFacts = (params.supplementalFacts ?? []).filter(Boolean);
+  const supplementalFactLines =
+    supplementalFacts.length > 0
+      ? supplementalFacts.slice(0, 8).map((item) => `- ${item}`).join("\n")
+      : "- 暂无补充事实。";
+  const supplementalFusionLines = buildFactFusionLines(
+    supplementalFacts,
+    primaryTenGod,
+    currentLuckText,
+  );
+  const mbtiProfile = inferMbtiFromBazi({
+    day_master: params.chart.day_master,
+    raw_bazi: params.chart.raw_bazi,
+    ten_gods: params.chart.ten_gods,
+    five_elements: params.chart.five_elements,
+  });
   const knowledgeNotes = buildBaziKnowledgeNotes({
     chart: params.chart,
     primaryTenGod,
     currentLuckTenGod,
+    mbtiProfile,
   });
   const relationshipLine = relationText ? `当前生效关系：${relationText}` : "当前生效关系：未指定关系";
+  const topTenGodText =
+    mbtiProfile.basis.top_ten_gods.length > 0
+      ? mbtiProfile.basis.top_ten_gods
+          .map((item) => `${item.name} ${item.energy_percent.toFixed(1)}%`)
+          .join(" / ")
+      : "未提取到稳定十神能量分布";
 
   const persona = `# ${params.name} · Persona
 
@@ -1204,6 +1380,22 @@ ${knowledgeNotes}
 - 成长脚本：通过复盘和迭代升级，而非情绪冲动升级。
 - 压力退化路径：高压时会变硬、变快、变短句。
 - 修复路径：复述目标、重建边界、给出行动清单。
+
+## MBTI 维度（八字推导）
+- 推导类型：${mbtiProfile.mbti_type}
+- 四轴得分：EI ${mbtiProfile.scores.ScoreEI}｜SN ${mbtiProfile.scores.ScoreSN}｜TF ${mbtiProfile.scores.ScoreTF}｜JP ${mbtiProfile.scores.ScoreJP}
+- 置信倾向：${Object.entries(mbtiProfile.tendency_analysis)
+  .map(([label, value]) => `${label} ${value}`)
+  .join(" / ")}
+- 推导依据：日主 ${mbtiProfile.basis.day_master_stem ?? "未识别"}（${mbtiProfile.basis.day_master_element}）｜强弱 ${mbtiProfile.basis.day_master_strength}｜十神主轴 ${topTenGodText}
+- 校准机制：阴印化官杀 ${mbtiProfile.basis.yin_transforms_guansha_calibration ? "已触发" : "未触发"}（用于微调 T/F 维度）
+- 使用边界：这是“行为倾向镜像”，用于提升可解释性，不用于给人贴死标签。
+
+## 创建时补充事实（用户提供）
+${supplementalFactLines}
+
+## 八字 × 现实信息融合（辅助解释）
+${supplementalFusionLines}
 
 ## 对话风格（像真人）
 - ${profile.speakDNA}
@@ -1290,6 +1482,16 @@ ${profile.samples
 - 推导：大运决定最近阶段偏移，不改写底层人格，只改变“最近更像什么”。
 - 行为落点：近期关键词为“${shift.keywords.join(" / ")}”。
 
+### 链路 5：十神能量 × 喜忌五行 → MBTI 四轴
+- 依据：十神能量分布与喜忌五行校准，按 EI/SN/TF/JP 四轴综合打分。
+- 推导：得到 MBTI 倾向 ${mbtiProfile.mbti_type}，并输出四轴置信度用于解释“为什么会这样说/这样判断”。
+- 行为落点：在沟通、决策和压力场景下，优先体现 ${mbtiProfile.mbti_type} 对应的偏好轨迹，同时保留八字本体的人格骨架。
+
+### 链路 6：现实补充事实 × 八字结构 → 人格细化
+- 依据：用户提供的补充事实（如背景、财富、外在、经历）与八字底盘共同建模。
+- 推导：现实事实不覆盖八字主轴，只用于提升“场景细节、关系质感、决策语境”的真实度。
+- 行为落点：同样的八字结构会因为现实经历不同而表现出不同的表达方式与互动温度。
+
 ### 精度说明
 - ${accuracyHint}
 
@@ -1371,9 +1573,167 @@ function formatPreviewCard(card: PreviewCard, lang: OutputLanguage = "zh"): stri
   ].join("\n");
 }
 
-function formatCreateIntroCard(lang: OutputLanguage = "zh"): string {
+function normalizeCountryCode(raw?: string): string | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  const code = raw.trim().toUpperCase();
+  if (!code) {
+    return undefined;
+  }
+  if (code.length === 2) {
+    return code;
+  }
+  const map: Record<string, string> = {
+    CHINA: "CN",
+    CN: "CN",
+    PRC: "CN",
+    HONGKONG: "HK",
+    HONG_KONG: "HK",
+    HK: "HK",
+    TAIWAN: "TW",
+    TW: "TW",
+    USA: "US",
+    US: "US",
+    UNITEDSTATES: "US",
+    UNITED_STATES: "US",
+    UK: "GB",
+    GB: "GB",
+    UNITEDKINGDOM: "GB",
+    UNITED_KINGDOM: "GB",
+    AUSTRALIA: "AU",
+    AU: "AU",
+    CANADA: "CA",
+    CA: "CA",
+    SINGAPORE: "SG",
+    SG: "SG",
+  };
+  return map[code.replace(/[\s-]/g, "")];
+}
+
+function resolveIntroLocale(params: {
+  args?: Record<string, string>;
+  lang: OutputLanguage;
+}): string {
+  const rawLocale = params.args?.locale?.trim();
+  if (rawLocale) {
+    return rawLocale;
+  }
+  const country = normalizeCountryCode(params.args?.country);
+  if (country) {
+    return `${params.lang}-${country}`;
+  }
+  const envCandidates = [
+    process.env.LC_MESSAGES?.trim(),
+    process.env.LANG?.trim(),
+    process.env.LC_ALL?.trim(),
+  ].filter((v): v is string => Boolean(v));
+  const envLocale = envCandidates.find((value) => {
+    const upper = value.toUpperCase();
+    return upper !== "C" && upper !== "C.UTF-8" && upper !== "POSIX";
+  });
+  if (envLocale) {
+    const normalized = envLocale
+      .replace(/\..*$/, "")
+      .replace(/_/g, "-");
+    const localeCountry = normalizeCountryCode(normalized.split("-")[1]);
+    if (localeCountry) {
+      return `${params.lang}-${localeCountry}`;
+    }
+  }
+  return params.lang === "en" ? "en-US" : "zh-CN";
+}
+
+function buildEnglishIntroExamples(locale: string): { line1: string; line2: string } {
+  const upper = locale.toUpperCase();
+  const isUS = upper.includes("US");
+  const isGBLike = upper.includes("GB") || upper.includes("UK") || upper.includes("AU");
+  if (isUS) {
+    return {
+      line1: "Shuqing, female, August 12, 1999, Shanghai, coworker",
+      line2: "Jason, male, March 12, 1991, 12:13 PM, Guangzhou, ex-partner",
+    };
+  }
+  if (isGBLike) {
+    return {
+      line1: "Shuqing, female, 12 August 1999, Shanghai, coworker",
+      line2: "Jason, male, 12 March 1991, 12:13, Guangzhou, ex-partner",
+    };
+  }
+  return {
+    line1: "Shuqing, female, 1999-08-12, Shanghai, coworker",
+    line2: "Jason, male, 1991-03-12 12:13, Guangzhou, ex-partner",
+  };
+}
+
+function buildChineseIntroExamples(locale: string): { line1: string; line2: string } {
+  const upper = locale.toUpperCase();
+  if (upper.includes("TW") || upper.includes("HK")) {
+    return {
+      line1: "舒晴，女，1999/8/12，上海，同事",
+      line2: "Jason，男，1991/3/12 12:13，廣州，前任",
+    };
+  }
+  return {
+    line1: "舒晴，1999年8月12日，上海，女，同事",
+    line2: "Jason，男，1991年3月12日 12:13，广州，前任",
+  };
+}
+
+function detectRuntimeClient(args?: Record<string, string>): RuntimeClient {
+  const explicit = args?.client?.trim().toLowerCase() ?? process.env.BAZI_PERSONA_CLIENT?.trim().toLowerCase();
+  if (explicit === "claude" || explicit === "openclaw" || explicit === "generic") {
+    return explicit;
+  }
+
+  const envKeys = Object.keys(process.env).map((key) => key.toUpperCase());
+  if (envKeys.some((key) => key.startsWith("CLAUDE"))) {
+    return "claude";
+  }
+  if (envKeys.some((key) => key.startsWith("OPENCLAW"))) {
+    return "openclaw";
+  }
+
+  const runtimePathHints = [
+    process.argv[1] ?? "",
+    process.cwd(),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (runtimePathHints.includes("/.claude/")) {
+    return "claude";
+  }
+  if (runtimePathHints.includes("/.openclaw/")) {
+    return "openclaw";
+  }
+  return "generic";
+}
+
+function buildCantianAsciiBanner(client: RuntimeClient): string {
+  if (client !== "claude") {
+    return "";
+  }
+  return [
+    " ▗▄▄▖ ▗▄▖ ▗▖  ▗▖▗▄▄▄▖▗▄▄▄▖ ▗▄▖ ▗▖  ▗▖     ▗▄▖ ▗▄▄▄▖",
+    "▐▌   ▐▌ ▐▌▐▛▚▖▐▌  █    █  ▐▌ ▐▌▐▛▚▖▐▌    ▐▌ ▐▌  █  ",
+    "▐▌   ▐▛▀▜▌▐▌ ▝▜▌  █    █  ▐▛▀▜▌▐▌ ▝▜▌    ▐▛▀▜▌  █  ",
+    "▝▚▄▄▖▐▌ ▐▌▐▌  ▐▌  █  ▗▄█▄▖▐▌ ▐▌▐▌  ▐▌    ▐▌ ▐▌▗▄█▄▖",
+    "                                                    ",
+    "                                                    ",
+    "                                                    ",
+  ].join("\n");
+}
+
+function formatCreateIntroCard(
+  lang: OutputLanguage = "zh",
+  locale = "zh-CN",
+  client: RuntimeClient = "generic",
+): string {
+  const banner = buildCantianAsciiBanner(client);
   if (lang === "en") {
-    return [
+    const examples = buildEnglishIntroExamples(locale);
+    const lines = [
+      ...(banner ? [banner, ""] : []),
       "Bazi Persona Skill · Cantian AI",
       "",
       "Build a living persona from Bazi that can speak, decide, and adapt over time.",
@@ -1387,15 +1747,18 @@ function formatCreateIntroCard(lang: OutputLanguage = "zh"): string {
       "",
       "Try this:",
       "",
-      "Shuqing, female, born on 1999-08-12 in Shanghai, coworker",
+      examples.line1,
       "",
       "Or:",
       "",
-      "Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner",
-    ].join("\n");
+      examples.line2,
+    ];
+    return lines.join("\n");
   }
 
-  return [
+  const examples = buildChineseIntroExamples(locale);
+  const lines = [
+    ...(banner ? [banner, ""] : []),
     "八字人格 Skill · 参天AI",
     "",
     "从八字出发，快速生成一个会说话、会判断、会变化的人格。",
@@ -1406,15 +1769,17 @@ function formatCreateIntroCard(lang: OutputLanguage = "zh"): string {
     "- 零基础可用：输入出生信息即可创建",
     "- 自然语言可用：直接说人话，不用记命令",
     "- 作弊模式：上帝视角看状态、关系、趋势",
+    "- You can also talk to me in English, Korean, or any language you like.",
     "",
     "可以这样开始：",
     "",
-    "舒晴，1999年8月12日，上海，女，同事",
+    examples.line1,
     "",
     "或者：",
     "",
-    "Jason，男，1991年3月12日 12:13 出生，广州人，前任",
-  ].join("\n");
+    examples.line2,
+  ];
+  return lines.join("\n");
 }
 
 function buildAutoActivationLine(params: {
@@ -1534,6 +1899,238 @@ function detectMemoryFactsFromText(content: string): string[] {
       ),
     )
     .slice(0, 20);
+}
+
+function splitNarrativeSentences(text: string): string[] {
+  return text
+    .split(/[\n。！？!?；;，,、]+/)
+    .map((x) => x.trim())
+    .map((x) => x.replace(/^[-*•\d.)\s]+/, "").trim())
+    .filter((x) => x.length >= 2)
+    .slice(0, 40);
+}
+
+function classifyNarrativeMemory(content: string): {
+  type: MemoryType;
+  weight: MemoryWeight;
+  source: MemoryEvent["source"];
+} {
+  if (
+    /(纠正|更正|不是|并非|请改|不要再说|其实是|correction|actually|not\s+true|wrong)/i.test(
+      content,
+    )
+  ) {
+    return {
+      type: "correction",
+      weight: "high",
+      source: "user_correction",
+    };
+  }
+  if (
+    /(毕业|学历|学校|清华|北大|家里|家庭|有钱|资产|收入|漂亮|颜值|外貌|工作|职业|创业|婚|恋|分手|孩子|来自|住在|性格|习惯|偏好|讨厌|喜欢|graduated|wealthy|rich|attractive|job|career|startup|married|divorce|relationship|from|live)/i.test(
+      content,
+    )
+  ) {
+    return {
+      type: "behavior_fact",
+      weight: "high",
+      source: "manual",
+    };
+  }
+  return {
+    type: "context_note",
+    weight: "medium",
+    source: "manual",
+  };
+}
+
+function collectCreateNarrativeContext(args: Record<string, string>): {
+  personaFacts: string[];
+  memoryEvents: MemoryEvent[];
+  appendLedger: NonNullable<PersonaMeta["source_ledger"]>;
+  incrementTextSources: number;
+  incrementCorrections: number;
+} {
+  const blocks: Array<{ text: string; source: "manual" | "text"; ref: string }> = [];
+  const directFields: Array<[string, string | undefined]> = [
+    ["story", args.story],
+    ["notes", args.notes],
+    ["note", args.note],
+    ["description", args.description],
+    ["background", args.background],
+    ["context", args.context],
+    ["extra", args.extra],
+    ["extra-info", args["extra-info"]],
+    ["profile", args.profile],
+    ["memory", args.memory],
+    ["correction", args.correction],
+  ];
+  for (const [field, raw] of directFields) {
+    const value = raw?.trim();
+    if (!value) {
+      continue;
+    }
+    blocks.push({
+      text: value,
+      source: "manual",
+      ref: `create:${field}`,
+    });
+  }
+
+  const textFilePath = args["text-file"]?.trim();
+  const textFromFile = readMaybeFile(textFilePath);
+  if (textFromFile) {
+    blocks.push({
+      text: textFromFile,
+      source: "text",
+      ref: textFilePath ?? "text-file",
+    });
+  }
+
+  if (blocks.length === 0) {
+    return {
+      personaFacts: [],
+      memoryEvents: [],
+      appendLedger: [],
+      incrementTextSources: 0,
+      incrementCorrections: 0,
+    };
+  }
+
+  const seen = new Set<string>();
+  const memoryEvents: MemoryEvent[] = [];
+  const personaFacts: string[] = [];
+  const appendLedger: NonNullable<PersonaMeta["source_ledger"]> = [];
+
+  for (const block of blocks) {
+    const snippets = splitNarrativeSentences(block.text);
+    if (snippets.length === 0) {
+      continue;
+    }
+    appendLedger.push(
+      buildSourceLedgerItem(
+        block.source,
+        block.ref,
+        block.source === "manual" ? "high" : "medium",
+      ),
+    );
+    for (const snippet of snippets) {
+      const normalized = snippet.replace(/\s+/g, " ").trim();
+      if (!normalized || seen.has(normalized)) {
+        continue;
+      }
+      seen.add(normalized);
+      const classified = classifyNarrativeMemory(normalized);
+      memoryEvents.push(
+        createMemoryEvent({
+          type: classified.type,
+          content: normalized,
+          weight: classified.weight,
+          source:
+            classified.type === "correction"
+              ? "user_correction"
+              : block.source,
+        }),
+      );
+      if (classified.type !== "correction") {
+        personaFacts.push(normalized);
+      }
+    }
+  }
+
+  return {
+    personaFacts: personaFacts.slice(0, 10),
+    memoryEvents,
+    appendLedger,
+    incrementTextSources: appendLedger.length,
+    incrementCorrections: memoryEvents.filter((x) => x.type === "correction").length,
+  };
+}
+
+function buildFactFusionLines(
+  facts: string[],
+  primaryTenGod: string,
+  currentLuckText: string,
+): string {
+  if (facts.length === 0) {
+    return "- 当前没有额外现实信息，默认按八字结构给出解释。";
+  }
+  return facts
+    .slice(0, 4)
+    .map((fact) => {
+      if (/(毕业|学历|学校|清华|北大|学习|读书)/.test(fact)) {
+        return `- 「${fact}」会优先联动“决策框架与执行标准”来解释：以十神 ${primaryTenGod} 的判断风格，校准其学习路径与职业选择。`;
+      }
+      if (/(有钱|资产|收入|家里|家庭|财富|经济)/.test(fact)) {
+        return `- 「${fact}」会联动“风险/金钱偏好 + 当前运势”解释：在 ${currentLuckText} 这段运势里，更看重资源配置节奏而非短期情绪消费。`;
+      }
+      if (/(漂亮|颜值|外貌|魅力|气质)/.test(fact)) {
+        return `- 「${fact}」会联动“关系表现与沟通风格”解释：外在吸引力会放大互动反馈，但核心仍受八字底层边界与情绪调节机制约束。`;
+      }
+      return `- 「${fact}」会作为现实锚点参与解读：以八字底盘为主，结合当前运势判断其在关系、决策和压力场景中的实际表现。`;
+    })
+    .join("\n");
+}
+
+function buildNarrativeMemoryEventsFromMessage(
+  message: string,
+  source: MemoryEvent["source"] = "chat",
+): MemoryEvent[] {
+  const snippets = splitNarrativeSentences(message).slice(0, 8);
+  const events: MemoryEvent[] = [];
+  for (const snippet of snippets) {
+    const normalized = snippet.replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      continue;
+    }
+    const classified = classifyNarrativeMemory(normalized);
+    if (classified.type !== "behavior_fact" && classified.type !== "correction") {
+      continue;
+    }
+    events.push(
+      createMemoryEvent({
+        type: classified.type,
+        content: normalized,
+        weight: classified.weight,
+        source: classified.type === "correction" ? "user_correction" : source,
+      }),
+    );
+  }
+  return events;
+}
+
+function appendUniqueMemoryEvents(target: MemoryEvent[], incoming: MemoryEvent[]): {
+  merged: MemoryEvent[];
+  added: MemoryEvent[];
+} {
+  const seen = new Set(target.map((x) => `${x.type}::${x.content}`));
+  const added: MemoryEvent[] = [];
+  const merged = [...target];
+  for (const event of incoming) {
+    const key = `${event.type}::${event.content}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(event);
+    added.push(event);
+  }
+  return { merged, added };
+}
+
+function pickRealityFactsFromMemory(memory: MemoryEvent[]): string[] {
+  return Array.from(
+    new Set(
+      memory
+        .filter(
+          (x) =>
+            (x.type === "behavior_fact" || x.type === "correction") &&
+            (x.weight === "high" || x.weight === "medium"),
+        )
+        .map((x) => x.content.trim())
+        .filter(Boolean),
+    ),
+  ).slice(-10);
 }
 
 function buildMemoryIndex(memory: MemoryEvent[], activeRelations: string[]): RuntimeMemoryIndex {
@@ -2078,6 +2675,19 @@ function resolveOutputLanguage(params: {
   if (params.meta?.preferred_language === "zh" || params.meta?.preferred_language === "en") {
     return params.meta.preferred_language;
   }
+  const envLang =
+    process.env.LC_MESSAGES?.trim() ||
+    process.env.LANG?.trim() ||
+    process.env.LC_ALL?.trim();
+  if (envLang) {
+    const normalized = envLang.toLowerCase();
+    if (normalized.startsWith("zh")) {
+      return "zh";
+    }
+    if (normalized.startsWith("en")) {
+      return "en";
+    }
+  }
   return "zh";
 }
 
@@ -2108,7 +2718,7 @@ async function resolveChartForCreate(args: Record<string, string>): Promise<Char
     gender: normalizeBirthGender(normalizeGender(args.gender)),
     calendarType: normalizeCalendarType(args.calendar),
     sect: args.sect === "1" ? 1 : 2,
-    sourceCommand: "/create-bazi-persona",
+    sourceCommand: "/bazi-persona create",
     trueSolarMode:
       args["true-solar"] === "on" || args["true-solar"] === "off"
         ? (args["true-solar"] as "on" | "off")
@@ -2303,7 +2913,7 @@ async function queryFlowStatus(args: Record<string, string>): Promise<void> {
     throw new Error(
       [
         `找不到人格：${slug}`,
-        "请先确认 slug，或先执行 /list-bazi-personas 查看可用列表。",
+        "请先确认 ID，或先执行 /bazi-persona list 查看可用列表。",
       ].join("\n"),
     );
   }
@@ -2377,6 +2987,54 @@ async function queryFlowStatus(args: Record<string, string>): Promise<void> {
   );
 }
 
+async function queryCalendarStatus(args: Record<string, string>): Promise<void> {
+  const uiLang = resolveOutputLanguage({ args });
+  const input = args.at ?? args.date;
+  const queryAt = parseDateTimeInput(input);
+  const calendar = await queryChineseCalendar({
+    year: queryAt.year,
+    month: queryAt.month,
+    day: queryAt.day,
+  });
+  if (!calendar) {
+    throw new Error(
+      pickLangLine(
+        uiLang,
+        "万年历暂不可用（cantian-tymext 未返回黄历数据）。",
+        "Calendar is currently unavailable (cantian-tymext did not return almanac data).",
+      ),
+    );
+  }
+  const lines = uiLang === "en"
+    ? [
+        "Calendar Snapshot",
+        `- Query time: ${queryAt.display}`,
+        `- Solar: ${calendar.公历}`,
+        `- Lunar: ${calendar.农历}`,
+        `- Ganzhi date: ${calendar.干支日期}`,
+        `- Zodiac: ${calendar.生肖}`,
+        `- Solar term: ${formatSolarTermInfo(calendar.节气, uiLang)}`,
+        `- Festivals: lunar ${calendar.农历节日 ?? "-"} | solar ${calendar.公历节日 ?? "-"}`,
+        `- Almanac: Do ${calendar.宜} | Avoid ${calendar.忌}`,
+        `- Clash/Omen: ${calendar.冲煞}`,
+        `- PengZu taboo: ${calendar.彭祖百忌}`,
+      ]
+    : [
+        "万年历查询",
+        `- 查询时间：${queryAt.display}`,
+        `- 公历：${calendar.公历}`,
+        `- 农历：${calendar.农历}`,
+        `- 干支日期：${calendar.干支日期}`,
+        `- 生肖：${calendar.生肖}`,
+        `- 节气：${formatSolarTermInfo(calendar.节气, uiLang)}`,
+        `- 节日：农历 ${calendar.农历节日 ?? "无"}｜公历 ${calendar.公历节日 ?? "无"}`,
+        `- 黄历宜忌：宜 ${calendar.宜}｜忌 ${calendar.忌}`,
+        `- 冲煞：${calendar.冲煞}`,
+        `- 彭祖百忌：${calendar.彭祖百忌}`,
+      ];
+  process.stdout.write(`${lines.join("\n")}\n`);
+}
+
 function buildPersonaSkillFile(params: {
   slug: string;
   name: string;
@@ -2392,8 +3050,24 @@ function buildPersonaSkillFile(params: {
   const fiveElementTrend = inferFiveElementTrend(params.chart.five_elements);
   const dayMaster = params.chart.day_master || "未知";
   const primaryTenGod = pickPrimaryTenGod(params.chart.ten_gods);
+  const mbtiProfile = inferMbtiFromBazi({
+    day_master: params.chart.day_master,
+    raw_bazi: params.chart.raw_bazi,
+    ten_gods: params.chart.ten_gods,
+    five_elements: params.chart.five_elements,
+  });
   const currentLuck = describeLuckCycle(pickCurrentLuck(params.chart));
   const baziSnapshot = markdownBaziSnapshot(params.chart);
+  const realityFacts = pickRealityFactsFromMemory(params.memory);
+  const realityFactText =
+    realityFacts.length > 0
+      ? realityFacts.map((item) => `- ${item}`).join("\n")
+      : "- 暂无现实锚点";
+  const realityFusionText = buildFactFusionLines(
+    realityFacts,
+    primaryTenGod,
+    currentLuck,
+  );
   const originalRelations = collectOriginalRelations(params.chart);
   const relationshipLabel = (params.meta.active_relationships ?? params.meta.relationships ?? [params.meta.relation ?? "未指定关系"])
     .filter(Boolean)
@@ -2448,8 +3122,16 @@ ${params.state}
 ${baziSnapshot}
 - 五行趋势提炼：${fiveElementTrend}
 - 十神主轴：${primaryTenGod}
+- MBTI 映射：${mbtiProfile.mbti_type}（EI ${mbtiProfile.scores.ScoreEI}｜SN ${mbtiProfile.scores.ScoreSN}｜TF ${mbtiProfile.scores.ScoreTF}｜JP ${mbtiProfile.scores.ScoreJP}）
 - 当前大运提炼：${currentLuck}
 - 模型精度模式：${params.meta.accuracy_mode}
+
+## Reality Anchors (Auto)
+
+${realityFactText}
+
+### Reality × Bazi Linkage
+${realityFusionText}
 
 ## 原局刑冲合会（提炼）
 
@@ -2562,6 +3244,106 @@ function buildIndex(baseDir: string): PersonaIndexItem[] {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
+function buildLaunchProfiles(baseDir: string): LaunchProfileItem[] {
+  if (!fs.existsSync(baseDir)) {
+    return [];
+  }
+  const rows: LaunchProfileItem[] = [];
+  const dirs = fs
+    .readdirSync(baseDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory());
+  for (const entry of dirs) {
+    const dir = path.join(baseDir, entry.name);
+    const metaPath = runtimeFile(dir, RUNTIME_META_FILE);
+    const evidencePath = runtimeFile(dir, RUNTIME_EVIDENCE_FILE);
+    if (!fileExists(metaPath)) {
+      continue;
+    }
+    try {
+      const meta = readJson<PersonaMeta>(metaPath);
+      const relationship = (
+        meta.active_relationships ??
+        meta.relationships ??
+        [meta.relation ?? "未指定关系"]
+      )
+        .filter(Boolean)
+        .join(" / ");
+      let bazi = "未提取";
+      if (fileExists(evidencePath)) {
+        const evidence = readJson<RuntimeEvidence>(evidencePath);
+        bazi = summarizeValue(asRecord(evidence.chart.raw_bazi)?.["八字"], 28);
+      }
+      rows.push({
+        id: meta.slug,
+        name: meta.name,
+        relationship: relationship || "未指定关系",
+        bazi,
+        updated_at: meta.updated_at,
+      });
+    } catch {
+      continue;
+    }
+  }
+  return rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 8);
+}
+
+function formatLaunchProfiles(rows: LaunchProfileItem[], lang: OutputLanguage): string {
+  if (rows.length === 0) {
+    return pickLangLine(
+      lang,
+      "当前还没有已创建的人格。你可以直接用一句话开始创建。",
+      "No personas found yet. You can start with one natural sentence.",
+    );
+  }
+  const header = pickLangLine(lang, `当前已有角色（${rows.length}）`, `Existing Personas (${rows.length})`);
+  const title = lang === "en"
+    ? "| Name | ID | Relation | Bazi |"
+    : "| 角色名称 | ID | 关系 | 八字摘要 |";
+  const divider = "| --- | --- | --- | --- |";
+  const body = rows.map((row) => {
+    const safe = (value: string, max: number): string => {
+      const t = value.replace(/\s+/g, " ").trim();
+      return t.length > max ? `${t.slice(0, Math.max(1, max - 1))}…` : t;
+    };
+    return `| ${safe(row.name, 14)} | ${safe(row.id, 18)} | ${safe(row.relationship, 18)} | ${safe(row.bazi, 36)} |`;
+  });
+  return [header, title, divider, ...body].join("\n");
+}
+
+function printWelcome(args: Record<string, string>): void {
+  const uiLang = resolveOutputLanguage({ args });
+  const introLocale = resolveIntroLocale({ args, lang: uiLang });
+  const client = detectRuntimeClient(args);
+  const baseDir = resolveBaseDir(args);
+  const launchProfiles = buildLaunchProfiles(baseDir);
+  const commonCommands = uiLang === "en"
+    ? [
+        "Common commands:",
+        "- /bazi-persona create",
+        "- /bazi-persona list",
+        "- /bazi-persona {id}",
+        "- /bazi-persona cheatsheet {id}",
+        "- /bazi-persona help",
+      ]
+    : [
+        "常用命令：",
+        "- /bazi-persona create",
+        "- /bazi-persona list",
+        "- /bazi-persona {id}",
+        "- /bazi-persona cheatsheet {id}",
+        "- /bazi-persona help",
+      ];
+  process.stdout.write(
+    [
+      formatCreateIntroCard(uiLang, introLocale, client),
+      "",
+      formatLaunchProfiles(launchProfiles, uiLang),
+      "",
+      ...commonCommands,
+    ].join("\n") + "\n",
+  );
+}
+
 async function createPersona(args: Record<string, string>): Promise<void> {
   if (!args["birth-location"] && args["birth-place"]) {
     args["birth-location"] = args["birth-place"];
@@ -2570,7 +3352,14 @@ async function createPersona(args: Record<string, string>): Promise<void> {
   const baseDir = resolveBaseDir(args);
   ensureDir(baseDir);
   const uiLang = resolveOutputLanguage({ args });
-  process.stdout.write(`${formatCreateIntroCard(uiLang)}\n\n`);
+  const introLocale = resolveIntroLocale({ args, lang: uiLang });
+  const runtimeClient = detectRuntimeClient(args);
+  const launchProfiles = buildLaunchProfiles(baseDir);
+  process.stdout.write(`${formatCreateIntroCard(uiLang, introLocale, runtimeClient)}\n`);
+  if (launchProfiles.length > 0) {
+    process.stdout.write(`\n${formatLaunchProfiles(launchProfiles, uiLang)}\n`);
+  }
+  process.stdout.write("\n");
 
   const name = args.name.trim();
   const slug = args.slug ? toSlug(args.slug) : toSlug(name);
@@ -2579,19 +3368,21 @@ async function createPersona(args: Record<string, string>): Promise<void> {
   if (fs.existsSync(path.join(dir, "SKILL.md")) || fs.existsSync(runtimeDir(dir))) {
     throw new Error(
       [
-        `slug 已存在：${slug}`,
-        "请改用新的 slug，或使用 update 命令更新已有人格。",
+        `ID 已存在：${slug}`,
+        "请改用新的 ID，或使用 update 命令更新已有人格。",
       ].join("\n"),
     );
   }
 
   const chart = await resolveChartForCreate(args);
+  const createContext = collectCreateNarrativeContext(args);
   const generatedPack = buildPersonaFromChart({
     name,
     relationships: relationshipSetup.relationships,
     activeRelationships: relationshipSetup.activeRelationships,
     gender: normalizeGender(args.gender),
     chart,
+    supplementalFacts: createContext.personaFacts,
   });
   const persona = readMaybeFile(args["persona-file"]) || generatedPack.persona;
   const state = readMaybeFile(args["state-file"]) || generatedPack.state;
@@ -2634,9 +3425,19 @@ async function createPersona(args: Record<string, string>): Promise<void> {
       location: args["birth-location"] ?? args["birth-place"],
       calendar_type: args.calendar === "lunar" ? "lunar" : "solar",
     },
-    command: "/create-bazi-persona",
+    command: "/bazi-persona create",
     accuracyMode,
   });
+  if (createContext.incrementTextSources > 0) {
+    meta.source_stats.text_count += createContext.incrementTextSources;
+  }
+  if (createContext.incrementCorrections > 0) {
+    meta.corrections_count += createContext.incrementCorrections;
+    meta.source_stats.correction_count += createContext.incrementCorrections;
+  }
+  if (createContext.appendLedger.length > 0) {
+    meta.source_ledger = [...(meta.source_ledger ?? []), ...createContext.appendLedger];
+  }
 
   const flowSnapshot = await buildFlowSnapshotMarkdown({
     chart,
@@ -2668,9 +3469,12 @@ async function createPersona(args: Record<string, string>): Promise<void> {
       updated_at: meta.updated_at,
     },
     meta,
-    memory: [],
+    memory: createContext.memoryEvents,
     memoryCheatsheet: [],
-    memoryIndex: buildMemoryIndex([], relationshipSetup.activeRelationships),
+    memoryIndex: buildMemoryIndex(
+      createContext.memoryEvents,
+      relationshipSetup.activeRelationships,
+    ),
     memoryPins: [],
     cheatsheetSession: createEmptyCheatsheetSession(),
   };
@@ -2678,7 +3482,7 @@ async function createPersona(args: Record<string, string>): Promise<void> {
     slug,
     name,
     chart,
-    memory: [],
+    memory: createContext.memoryEvents,
     meta,
     persona,
     state,
@@ -2696,8 +3500,8 @@ async function createPersona(args: Record<string, string>): Promise<void> {
       pickLangLine(uiLang, `触发词：/${slug}`, `Trigger: /${slug}`),
       pickLangLine(
         uiLang,
-        "别名提示：/create-bazi-persona（主命令） /create-bazi（友好别名）",
-        "Command aliases: /create-bazi-persona (primary) /create-bazi (friendly)",
+        "常用命令：/bazi-persona create | /bazi-persona list | /bazi-persona help",
+        "Common commands: /bazi-persona create | /bazi-persona list | /bazi-persona help",
       ),
       pickLangLine(uiLang, `已自动切换到角色模式：${name}`, `Auto-switched to persona mode: ${name}`),
       pickLangLine(
@@ -2730,6 +3534,20 @@ async function createPersona(args: Record<string, string>): Promise<void> {
         "增强建议：1) 导入聊天片段 2) 补充现实经历 3) 添加公开链接资料",
         "Boost fit quickly: 1) add chat snippets 2) add real-life facts 3) add public links",
       ),
+      ...(createContext.memoryEvents.length > 0
+        ? [
+            pickLangLine(
+              uiLang,
+              `已吸收创建时补充信息：${createContext.memoryEvents.length} 条，并联动八字用于人格细化。`,
+              `Absorbed ${createContext.memoryEvents.length} supplemental notes from creation input and linked them with Bazi interpretation.`,
+            ),
+          ]
+        : []),
+      pickLangLine(
+        uiLang,
+        `如需一键开启 Claude/OpenClaw 便捷启动：npm run bazi:agent:enable -- --slug ${slug}`,
+        `To enable one-command startup in Claude/OpenClaw: npm run bazi:agent:enable -- --slug ${slug}`,
+      ),
       pickLangLine(uiLang, "你下一句直接说需求即可，我会持续按该人格回应。", "Send your next message naturally and I'll stay in persona."),
     ].join("\n") + "\n",
   );
@@ -2744,7 +3562,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
     throw new Error(
       [
         `找不到人格：${slug}`,
-        "请先确认 slug，或先执行 /list-bazi-personas 查看可用列表。",
+        "请先确认 ID，或先执行 /bazi-persona list 查看可用列表。",
       ].join("\n"),
     );
   }
@@ -2783,12 +3601,14 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
   const statePatch = readMaybeFile(args["state-patch-file"]);
   const correction = args.correction?.trim();
   const memoryInput = args.memory?.trim();
+  const messageText = args.message?.trim();
   const chatText = readMaybeFile(args["chat-file"]);
   const textMaterial = readMaybeFile(args["text-file"]);
   const urls = splitCsv(args.url);
   const memoryType = parseMemoryType(args["memory-type"]);
   const memoryWeight = parseMemoryWeight(args["memory-weight"]);
   const incomingChart = readMaybeFile(args["chart-file"]);
+  let messageCorrectionCount = 0;
   const relationshipSet = parseRelationshipSet(
     args,
     runtime.meta.relationships ?? [runtime.meta.relation ?? "未指定关系"],
@@ -2796,7 +3616,7 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
   const runtimeMode = resolveStateRuntime(runtime.state.runtime, args);
   const uiLang = resolveOutputLanguage({ args, meta: runtime.meta });
 
-  if (!personaPatch && !statePatch && !correction && !memoryInput && !incomingChart && !chatText && !textMaterial && urls.length === 0 && !args["memory-pin"] && !args["memory-unpin"] && !args["memory-forget"]) {
+  if (!personaPatch && !statePatch && !correction && !memoryInput && !messageText && !incomingChart && !chatText && !textMaterial && urls.length === 0 && !args["memory-pin"] && !args["memory-unpin"] && !args["memory-forget"]) {
     throw new Error(
       [
         "没有检测到任何更新内容。",
@@ -2851,6 +3671,24 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
         source: "manual",
       }),
     ];
+  }
+  if (messageText) {
+    const messageEvents = buildNarrativeMemoryEventsFromMessage(messageText, "chat");
+    if (messageEvents.length > 0) {
+      const merged = appendUniqueMemoryEvents(currentMemory, messageEvents);
+      currentMemory = merged.merged;
+      messageCorrectionCount = merged.added.filter((x) => x.type === "correction").length;
+    } else {
+      const merged = appendUniqueMemoryEvents(currentMemory, [
+        createMemoryEvent({
+          type: "context_note",
+          content: messageText,
+          source: "chat",
+          weight: "low",
+        }),
+      ]);
+      currentMemory = merged.merged;
+    }
   }
   if (incomingChart) {
     currentChart = JSON.parse(incomingChart) as ChartLike;
@@ -2918,17 +3756,18 @@ async function updatePersona(args: Record<string, string>): Promise<void> {
   const memoryCorrectionCount = [
     ...(correction ? [correction] : []),
     ...(memoryInput && memoryType === "correction" ? [memoryInput] : []),
-  ].length;
+  ].length + messageCorrectionCount;
   const appendLedger = [
+    ...(messageText ? [buildSourceLedgerItem("chat", "update:message", "high")] : []),
     ...(chatText ? [buildSourceLedgerItem("chat", args["chat-file"] ?? "chat-file", "high")] : []),
     ...(textMaterial ? [buildSourceLedgerItem("text", args["text-file"] ?? "text-file", "medium")] : []),
     ...urls.map((x) => buildSourceLedgerItem("url", x, "low")),
   ];
 
   const nextMeta = updateMeta(runtime.meta, {
-    command: "/update-bazi-persona",
+    command: "/bazi-persona update",
     incrementCorrections: memoryCorrectionCount,
-    incrementChatSources: Number.parseInt(args["inc-chat"] ?? "0", 10) + (chatText ? 1 : 0),
+    incrementChatSources: Number.parseInt(args["inc-chat"] ?? "0", 10) + (chatText ? 1 : 0) + (messageText ? 1 : 0),
     incrementTextSources: Number.parseInt(args["inc-text"] ?? "0", 10) + (textMaterial ? 1 : 0) + urls.length,
     accuracyMode: incomingChart
       ? detectAccuracyMode(currentChart)
@@ -3030,7 +3869,7 @@ function listPersonas(args: Record<string, string>): void {
   for (const row of rows) {
     process.stdout.write(
       [
-        `- slug: ${row.slug}`,
+        `- ${pickLangLine(uiLang, "ID", "ID")}: ${row.slug}`,
         `  ${pickLangLine(uiLang, "名称", "Name")}: ${row.name}`,
         `  ${pickLangLine(uiLang, "版本", "Version")}: ${row.version}`,
         `  ${pickLangLine(uiLang, "创建", "Created")}: ${row.created_at}`,
@@ -3050,7 +3889,7 @@ function deletePersona(args: Record<string, string>): void {
     throw new Error(
       [
         `找不到人格：${slug}`,
-        "请先确认 slug 再删除。",
+        "请先确认 ID 再删除。",
       ].join("\n"),
     );
   }
@@ -3065,7 +3904,7 @@ function deletePersona(args: Record<string, string>): void {
   if (args["confirm-2"] !== slug) {
     throw new Error(
       [
-        "删除确认失败：第二步 slug 不匹配。",
+        "删除确认失败：第二步 ID 不匹配。",
         `请传入 --confirm-2 ${slug}。`,
       ].join("\n"),
     );
@@ -3304,8 +4143,8 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
         pickLangLine(uiLang, "Cheatsheet 模式当前未开启。", "Cheatsheet mode is currently OFF."),
         pickLangLine(
           uiLang,
-          "先执行：--action cheatsheet --slug <slug> --mode on",
-          "Run first: --action cheatsheet --slug <slug> --mode on",
+          "先执行：--action cheatsheet --slug <id> --mode on",
+          "Run first: --action cheatsheet --slug <id> --mode on",
         ),
       ].join("\n") + "\n",
     );
@@ -3317,6 +4156,7 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     .slice(-4)
     .map((x) => x.content)
     .join(" | ");
+  let promotedToBackground: MemoryEvent[] = [];
   if (userMessage.trim()) {
     runtime.cheatsheetSession.messages.push({
       role: "user",
@@ -3325,26 +4165,47 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
     });
     runtime.cheatsheetSession.messages = runtime.cheatsheetSession.messages.slice(-10);
     runtime.cheatsheetSession.updated_at = nowIso();
-    const extracted = detectMemoryFactsFromText(userMessage).slice(0, 6);
-    if (extracted.length > 0) {
-      runtime.memoryCheatsheet.push(
-        ...extracted.map((content) =>
-          createMemoryEvent({
-            type: "behavior_fact",
-            content,
-            source: "manual",
-            weight: "medium",
-          })),
-      );
-    } else {
-      runtime.memoryCheatsheet.push(
-        createMemoryEvent({
-          type: "context_note",
-          content: userMessage.trim(),
-          source: "manual",
-          weight: "low",
-        }),
-      );
+    const narrativeEvents = buildNarrativeMemoryEventsFromMessage(userMessage, "chat");
+    const cheatsheetEvents =
+      narrativeEvents.length > 0
+        ? narrativeEvents
+        : [
+            createMemoryEvent({
+              type: "context_note",
+              content: userMessage.trim(),
+              source: "manual",
+              weight: "low",
+            }),
+          ];
+    const cheatsheetAppend = appendUniqueMemoryEvents(
+      runtime.memoryCheatsheet,
+      cheatsheetEvents,
+    );
+    runtime.memoryCheatsheet = cheatsheetAppend.merged;
+
+    if (narrativeEvents.length > 0) {
+      const promotedAppend = appendUniqueMemoryEvents(runtime.memory, narrativeEvents);
+      runtime.memory = promotedAppend.merged;
+      promotedToBackground = promotedAppend.added;
+      if (promotedToBackground.length > 0) {
+        const correctionInc = promotedToBackground.filter((x) => x.type === "correction").length;
+        runtime.meta = updateMeta(runtime.meta, {
+          command: "/bazi-persona cheatsheet",
+          incrementCorrections: correctionInc,
+          incrementChatSources: 1,
+          appendLedger: [buildSourceLedgerItem("chat", "cheatsheet:message", "high")],
+          preferredLanguage: args.lang ? parsePreferredLanguage(args.lang) : undefined,
+        });
+        runtime.memoryIndex = buildMemoryIndex(
+          runtime.memory,
+          runtime.meta.active_relationships ??
+            runtime.meta.relationships ??
+            [runtime.meta.relation ?? "未指定关系"],
+        );
+        runtime.core.updated_at = runtime.meta.updated_at;
+        runtime.state.updated_at = runtime.meta.updated_at;
+        runtime.evidence.updated_at = runtime.meta.updated_at;
+      }
     }
   }
   const at = args.at;
@@ -3477,6 +4338,21 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
   });
   runtime.cheatsheetSession.messages = runtime.cheatsheetSession.messages.slice(-10);
   runtime.cheatsheetSession.updated_at = nowIso();
+  writeUtf8(
+    path.join(dir, "SKILL.md"),
+    buildPersonaSkillFile({
+      slug: runtime.meta.slug,
+      name: runtime.meta.name,
+      chart: runtime.evidence.chart,
+      memory: runtime.memory,
+      meta: runtime.meta,
+      persona: runtime.core.persona_markdown,
+      state: runtime.state.state_markdown,
+      flowSnapshot,
+      stateRuntime: runtime.state.runtime,
+      memoryPins: runtime.memoryPins,
+    }),
+  );
   saveRuntimeBundleToDisk(dir, runtime);
   process.stdout.write(
     [
@@ -3486,6 +4362,15 @@ async function cheatsheetPersona(args: Record<string, string>): Promise<void> {
       affinity
         ? pickLangLine(uiLang, `- 消息好感度：${affinity.score}/100（${affinity.reason}）`, `- Message affinity: ${affinity.score}/100 (${affinity.reason})`)
         : pickLangLine(uiLang, "- 消息好感度：已关闭", "- Message affinity: OFF"),
+      ...(promotedToBackground.length > 0
+        ? [
+            pickLangLine(
+              uiLang,
+              `- 自动记忆：本轮识别到 ${promotedToBackground.length} 条事实，已同步到背景记忆并联动八字分析。`,
+              `- Auto memory: captured ${promotedToBackground.length} fact(s), synced to background memory and Bazi-linked analysis.`,
+            ),
+          ]
+        : []),
       "",
       pickLangLine(
         uiLang,
@@ -3593,17 +4478,121 @@ function memoryOps(args: Record<string, string>): void {
   );
 }
 
+async function agentOps(args: Record<string, string>): Promise<void> {
+  const op = (args.op ?? args["agent-action"] ?? "enable").toLowerCase();
+  if (!["enable", "sync", "remove", "list"].includes(op)) {
+    throw new Error(
+      [
+        "不支持的 agent 操作。",
+        "可用：enable / sync / remove / list",
+        "示例：--action agent --op enable",
+      ].join("\n"),
+    );
+  }
+  const bridgeArgs: Record<string, string> = {
+    ...args,
+    action: op,
+  };
+  await runAgentBridge(bridgeArgs);
+}
+
+function printCommandHelp(args: Record<string, string>): void {
+  const uiLang = resolveOutputLanguage({ args });
+  const baseDir = resolveBaseDir(args);
+  const launchProfiles = buildLaunchProfiles(baseDir);
+  const profileText = formatLaunchProfiles(launchProfiles, uiLang);
+  if (uiLang === "en") {
+    const lines = [
+      "Bazi Persona Help",
+      "",
+      "Common commands",
+      "- /bazi-persona create",
+      "- /bazi-persona list",
+      "- /bazi-persona {id}",
+      "- /bazi-persona update {id}",
+      "- /bazi-persona cheatsheet {id}",
+      "- /bazi-persona flow {id}",
+      "- /bazi-persona calendar [date]",
+      "- /bazi-persona agent enable",
+      "- /bazi-persona agent list",
+      ];
+    if (profileText) {
+      lines.push("", profileText);
+    }
+    lines.push(
+      "",
+      "All commands",
+      "- /bazi-persona help",
+      "- /bazi-persona rollback {id} {version}",
+      "- /bazi-persona delete {id}",
+      "- /bazi-persona compat {idA} {idB}",
+      "- /bazi-persona memory {id}",
+      "- /bazi-persona ingest {id}",
+      "- /bazi-persona agent sync [claude|openclaw|both]",
+      "- /bazi-persona agent remove",
+      "",
+      "CLI bridge examples",
+      "- npm run bazi -- --action agent --op enable",
+      "- npm run bazi -- --action agent --op sync --target both",
+      "- npm run bazi -- --action agent --op list",
+      "- npm run bazi -- --action agent --op remove --confirm DELETE",
+    );
+    process.stdout.write(`${lines.join("\n")}\n`);
+    return;
+  }
+  const lines = [
+    "八字人格帮助",
+    "",
+    "常用命令",
+    "- /bazi-persona create",
+    "- /bazi-persona list",
+    "- /bazi-persona {id}",
+    "- /bazi-persona update {id}",
+    "- /bazi-persona cheatsheet {id}",
+    "- /bazi-persona flow {id}",
+    "- /bazi-persona calendar [date]",
+    "- /bazi-persona agent enable",
+    "- /bazi-persona agent list",
+  ];
+  if (profileText) {
+    lines.push("", profileText);
+  }
+  lines.push(
+    "",
+    "全部命令",
+    "- /bazi-persona help",
+    "- /bazi-persona rollback {id} {version}",
+    "- /bazi-persona delete {id}",
+    "- /bazi-persona compat {idA} {idB}",
+    "- /bazi-persona memory {id}",
+    "- /bazi-persona ingest {id}",
+    "- /bazi-persona agent sync [claude|openclaw|both]",
+    "- /bazi-persona agent remove",
+    "",
+    "CLI 对应写法",
+    "- npm run bazi -- --action agent --op enable",
+    "- npm run bazi -- --action agent --op sync --target both",
+    "- npm run bazi -- --action agent --op list",
+    "- npm run bazi -- --action agent --op remove --confirm DELETE",
+  );
+  process.stdout.write(`${lines.join("\n")}\n`);
+}
+
 async function main(): Promise<void> {
   const args = parseCliArgs(process.argv);
-  const action = args.action;
-  if (!action || !["create", "update", "list", "delete", "rollback", "flow", "ingest", "cheatsheet", "compat", "memory"].includes(action)) {
+  const action = args.action ?? "welcome";
+  if (!["welcome", "create", "update", "list", "delete", "rollback", "flow", "calendar", "ingest", "cheatsheet", "compat", "memory", "agent", "help"].includes(action)) {
     throw new Error(
       [
         "缺少或不支持的 action。",
-        "可用值：create / update / list / delete / rollback / flow / ingest / cheatsheet / compat / memory",
-        "示例：使用 /list-bazi-personas 查看已创建人格。",
+        "可用值：welcome / create / update / list / delete / rollback / flow / calendar / ingest / cheatsheet / compat / memory / agent / help",
+        "示例：使用 /bazi-persona list 查看已创建人格。",
       ].join("\n"),
     );
+  }
+  if (action === "welcome") {
+    printWelcome(args);
+    return;
   }
   if (action === "create") {
     await createPersona(args);
@@ -3625,6 +4614,10 @@ async function main(): Promise<void> {
     await queryFlowStatus(args);
     return;
   }
+  if (action === "calendar") {
+    await queryCalendarStatus(args);
+    return;
+  }
   if (action === "ingest") {
     await ingestPersona(args);
     return;
@@ -3639,6 +4632,14 @@ async function main(): Promise<void> {
   }
   if (action === "memory") {
     memoryOps(args);
+    return;
+  }
+  if (action === "agent") {
+    await agentOps(args);
+    return;
+  }
+  if (action === "help") {
+    printCommandHelp(args);
     return;
   }
   deletePersona(args);

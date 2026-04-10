@@ -168,7 +168,7 @@ function main(): void {
       throw new Error(
         [
           "初始化元信息失败，必填字段缺失。",
-          "请确保包含 name、slug、birth-date、birth-location。",
+          "请确保包含 name、slug(ID)、birth-date、birth-location。",
           "示例：--name 张三 --slug zhang-san --birth-date 1990-01-01 --birth-location 北京",
         ].join("\n"),
       );
@@ -188,7 +188,7 @@ function main(): void {
         location,
         calendar_type: (args.calendar as "solar" | "lunar") ?? "solar",
       },
-      command: "/create-bazi-persona",
+      command: "/bazi-persona create",
       accuracyMode:
         args["accuracy-mode"] === "missing_time_six_pillars"
           ? "missing_time_six_pillars"
@@ -210,7 +210,7 @@ function main(): void {
   }
   const current = JSON.parse(raw) as PersonaMeta;
   const next = updateMeta(current, {
-    command: args.command ?? "/update-bazi-persona",
+    command: args.command ?? "/bazi-persona update",
     incrementCorrections: Number.parseInt(args["inc-correction"] ?? "0", 10),
     incrementChatSources: Number.parseInt(args["inc-chat"] ?? "0", 10),
     incrementTextSources: Number.parseInt(args["inc-text"] ?? "0", 10),

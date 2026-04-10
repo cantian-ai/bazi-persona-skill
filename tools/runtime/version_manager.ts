@@ -104,8 +104,8 @@ export function backupPersona(
     throw new Error(
       [
         `找不到人格目录：${dir}`,
-        "请先确认 slug 是否正确。",
-        "你可以先执行 /list-bazi-personas 查看可用 slug。",
+        "请先确认 ID 是否正确。",
+        "你可以先执行 /bazi-persona list 查看可用 ID。",
       ].join("\n"),
     );
   }
@@ -176,7 +176,7 @@ function resolveVersionFolder(baseDir: string, slug: string, requested: string):
     throw new Error(
       [
         "当前人格还没有历史版本可回滚。",
-        "请先执行更新，或检查 slug 是否正确。",
+        "请先执行更新，或检查 ID 是否正确。",
       ].join("\n"),
     );
   }
@@ -189,7 +189,7 @@ function resolveVersionFolder(baseDir: string, slug: string, requested: string):
     throw new Error(
       [
         `未找到版本：${requested}`,
-        "请先执行 /list-bazi-personas 或 version list 查看可选版本。",
+        "请先执行 /bazi-persona list 或 version list 查看可选版本。",
       ].join("\n"),
     );
   }
@@ -203,7 +203,7 @@ export function rollbackPersona(baseDir: string, slug: string, version: string):
     throw new Error(
       [
         `找不到人格目录：${dir}`,
-        "请先确认 slug 是否正确。",
+        "请先确认 ID 是否正确。",
       ].join("\n"),
     );
   }
@@ -235,7 +235,7 @@ export function rollbackPersona(baseDir: string, slug: string, version: string):
     const nextMeta: PersonaMeta = {
       ...meta,
       updated_at: nowIso(),
-      command_history: [...meta.command_history, "/bazi-persona-rollback"],
+      command_history: [...meta.command_history, "/bazi-persona rollback"],
     };
     writeJson(metaPath, nextMeta);
   }
@@ -247,7 +247,7 @@ export function rollbackPersona(baseDir: string, slug: string, version: string):
       const nextMeta: PersonaMeta = {
         ...meta,
         updated_at: nowIso(),
-        command_history: [...meta.command_history, "/bazi-persona-rollback"],
+        command_history: [...meta.command_history, "/bazi-persona rollback"],
       };
       writeUtf8(skillPath, updateSkillInternalMeta(skillText, nextMeta));
     }
@@ -258,7 +258,7 @@ export function rollbackPersona(baseDir: string, slug: string, version: string):
     const nextRuntimeMeta: PersonaMeta = {
       ...runtimeMeta,
       updated_at: nowIso(),
-      command_history: [...runtimeMeta.command_history, "/bazi-persona-rollback"],
+      command_history: [...runtimeMeta.command_history, "/bazi-persona rollback"],
     };
     writeJson(runtimeMetaPath, nextRuntimeMeta);
   }
@@ -289,16 +289,16 @@ function main(): void {
       [
         "缺少或不支持的 action。",
         "可用值：backup / list / rollback",
-        "示例：使用 /bazi-persona-rollback {slug} {version} 或版本列表能力。",
+        "示例：使用 /bazi-persona rollback {id} {version} 或版本列表能力。",
       ].join("\n"),
     );
   }
   if (!slug) {
     throw new Error(
       [
-        "缺少 slug，无法定位人格目录。",
+        "缺少 ID，无法定位人格目录。",
         "请提供 --slug。",
-        "示例：先用 /list-bazi-personas 获取 slug。",
+        "示例：先用 /bazi-persona list 获取 ID。",
       ].join("\n"),
     );
   }
@@ -321,7 +321,7 @@ function main(): void {
       [
         "回滚失败，缺少目标版本。",
         "请提供 --version。",
-        "示例：/bazi-persona-rollback demo v2",
+        "示例：/bazi-persona rollback demo v2",
       ].join("\n"),
     );
   }

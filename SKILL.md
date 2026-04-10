@@ -1,7 +1,7 @@
 ---
 name: bazi-persona
-description: "Bazi persona toolkit. Create, update, list, rollback, and delete personas via /create-bazi-persona, /update-bazi-persona, /list-bazi-personas, /bazi-persona-rollback, /delete-bazi-persona (aliases: /create-bazi, /update-bazi, /list-bazi, /rollback-bazi, /delete-bazi)."
-argument-hint: "[slug]"
+description: "Bazi persona toolkit with single entry command /bazi-persona. Use /bazi-persona help to view all commands."
+argument-hint: "[id]"
 version: "2.0.0"
 user-invocable: true
 allowed-tools: Bash
@@ -19,42 +19,48 @@ allowed-tools: Bash
 6. 创建流程必须尽量用单次本地命令完成，避免让用户反复授权。
 7. 非必要不读取额外 markdown 文件；优先直接执行单入口命令。
 8. 用户可用任意语言输入；默认跟随用户语言回复，必要时中英双语并列说明。
+9. 若用户需要在 Claude Code / OpenClaw 便捷复用人格，优先引导执行 agent 同步命令。
 
-## 触发命令
+## 常用命令
 
-主命令：
+统一入口：`/bazi-persona`
 
-- `/create-bazi-persona`
-- `/update-bazi-persona {slug}`
-- `/list-bazi-personas`
-- `/bazi-persona-rollback {slug} {version}`
-- `/delete-bazi-persona {slug}`
-- `/query-bazi-flow {slug} {datetime?}`
-- `/bazi-cheatsheet {slug}`
-- `/bazi-compat {slugA} {slugB}`
-- `/memory-bazi {slug}`
-- `/ingest-bazi-persona {slug}`
+- `/bazi-persona create`：创建新人格
+- `/bazi-persona list`：查看所有人格
+- `/bazi-persona {id}`：直接进入该人格对话（例如 `/bazi-persona xiao-mei`）
+- `/bazi-persona update {id}`：补充资料并更新
+- `/bazi-persona cheatsheet {id}`：开启/使用作弊模式
+- `/bazi-persona flow {id}`：查询当前时运状态
+- `/bazi-persona calendar [date]`：查询万年历/黄历（节气、宜忌、冲煞）
+- `/bazi-persona agent enable`：一键启用 Claude/OpenClaw 角色同步
+- `/bazi-persona agent list`：查看同步目标与角色表
 
-友好别名：
+查看全部命令：
 
-- `/create-bazi`
-- `/update-bazi`
-- `/list-bazi`
-- `/rollback-bazi`
-- `/delete-bazi`
-- `/flow-bazi`
-- `/cheatsheet-bazi`
-- `/compat-bazi`
-- `/memory-bazi`
-- `/ingest-bazi`
+- `/bazi-persona help`
+- `/bazi-persona agent sync [claude|openclaw|both]`
+- `/bazi-persona agent remove`
 
-规则：对外提示展示“主命令 + 别名”，但日志与元信息只记录主命令。
+规则：对外统一使用 `/bazi-persona ...`，不再暴露历史分散命令。
+
+Agent 同步命令（平台集成）：
+
+- `npm run bazi:agent:enable`（一键引导开启，推荐）
+- `npm run bazi:agent:list`
+- `npm run bazi:agent:sync`
+- `npm run bazi:agent:sync:claude`
+- `npm run bazi:agent:sync:openclaw`
+
+术语说明（对用户）：
+- `ID` 为对外显示名，内部参数仍为 `slug`（兼容历史命令）。
 
 ## 体验标准（执行中必须遵守）
 
 1. 首次创建只收集基础 5 项：名称、出生日期、出生时间（可缺失）、出生地点、性别。
    用户可自然输入，你负责解析与标准化，不要求对方按固定模板填写。
 2. 首次引导必须用用户语言强调亮点：零基础可用、自然语言可用、作弊模式可用。
+2.2 人格提炼必须包含 MBTI 映射（EI/SN/TF/JP）并解释“八字如何推导出该结果”。
+2.1 启动屏示例要按用户地区习惯显示日期/时间格式（可由 locale/country 推断）。
 3. 先给一条“一句话可复制示例”，让用户直接改内容提交。
 4. 要明确告诉用户：不打命令也能自然语言触发主要流程。
 5. 作弊模式是核心卖点，开场和成功后引导都要明确可见。
@@ -163,8 +169,9 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 1. 生成长期人格分析草稿（core）。
 2. 生成当前阶段修正（state）。
-3. 把用户纠正、文本线索写入 memory 事件流（memory）。
-4. 生成最终 `SKILL.md`（面向用户的唯一主文件）。
+3. 生成 MBTI 四轴映射（EI/SN/TF/JP + 置信度 + 校准机制说明）。
+4. 把用户纠正、文本线索写入 memory 事件流（memory）。
+5. 生成最终 `SKILL.md`（面向用户的唯一主文件）。
 
 ### Step 4：预览并写入
 
@@ -211,7 +218,7 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 命令：
 
-- `/query-bazi-flow {slug} {datetime?}`
+- `/bazi-persona flow {id} {datetime?}`
 
 功能要求：
 
@@ -224,7 +231,7 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 命令：
 
-- `/bazi-cheatsheet {slug}`（开启后可持续使用）
+- `/bazi-persona cheatsheet {id}`（开启后可持续使用）
 
 行为：
 
@@ -250,7 +257,7 @@ Jason, male, born at 12:13 on 1991-03-12 in Guangzhou, ex-partner
 
 当用户触发管理命令时，内部调用工具完成，并仅返回结果摘要：
 
-- 列表：slug / 名称 / 版本 / 创建时间 / 更新时间 / 资料来源数量
+- 列表：ID / 名称 / 版本 / 创建时间 / 更新时间 / 资料来源数量
 - 回滚：回滚目标版本 + 回滚前快照版本
 - 删除：双确认后删除成功提示
 

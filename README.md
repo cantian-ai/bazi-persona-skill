@@ -10,11 +10,14 @@ It turns birth information into actionable speaking/decision rules and supports 
 - 零基础可用：不会八字也能创建。
 - 自然语言可用：直接说人话就能开始，不必记命令。
 - 作弊模式：像“上帝视角”一样问状态、关系、趋势，并可继续正常聊天。
+- MBTI 映射：基于八字推导 EI/SN/TF/JP 四轴，让人格差异更直观。
 
 User highlights:
 - Beginner-friendly: create a persona even if you know nothing about Bazi.
 - Natural-language first: talk normally, no rigid command template required.
 - Cheatsheet mode: ask status/relationship/trend questions with a God-view while keeping normal chat.
+- Agent-ready for Claude Code and OpenClaw: sync personas into agent files for one-step startup.
+- MBTI mapping: infer EI/SN/TF/JP from Bazi for clearer personality contrast.
 
 ## 多语言支持 / Multilingual Support
 
@@ -78,6 +81,7 @@ npm run bazi -- --action create \
   --birth-location "上海" \
   --relationships "同事,恋人" \
   --set-active-relationships "同事" \
+  --story "她是清华毕业的。她家很有钱。她很漂亮。" \
   --true-solar "auto" \
   --day-rollover 23
 ```
@@ -86,7 +90,9 @@ npm run bazi -- --action create \
 - 默认会在创建时自动排盘并落盘，不需要再手动跑 `bazi_calc`。
 - 默认生成人格目录：`~/.bazi-personas`（不会进入当前项目 Git）。
 - 如需写到项目内测试目录，可显式传：`--base-dir ./personas`。
+- 启动屏示例会按语言和地区习惯变化；默认自动读取系统语言环境（如 `zh_CN`、`en_US`、`en_GB`），也可显式传：`--locale en-US` / `--locale en-GB` / `--locale zh-CN`，或 `--country US/GB/CN`。
 - `--birth-time` 可缺失，系统会自动进入缺时精简模式。
+- 初始化可直接追加现实信息（`--story/--notes/--background/--text-file`），会自动记忆并联动八字解释人格。
 - 创建与更新默认一次执行到底，不再弹“确认写入”二次交互。
 - 如需取消写入，可显式加 `--yes false`。
 - 若未传 `--relation`，交互模式会补问一次关系（可填“名人/无关系”）。
@@ -122,6 +128,16 @@ npm run bazi -- --action flow \
   --at "2026-04-09 20:30"
 ```
 
+6.1 万年历 / 黄历查询（可选）
+
+```bash
+# 查询今天
+npm run bazi -- --action calendar
+
+# 查询指定日期（支持自然日期）
+npm run bazi -- --action calendar --date "2026-04-10"
+```
+
 7. cheatsheet 模式（显式触发） / Cheatsheet mode (explicit trigger)
 
 ```bash
@@ -143,6 +159,7 @@ npm run bazi -- --action cheatsheet --slug "shi-li-ren-wu" --mode off
 说明：
 - `mode off` 会清空 cheatsheet 会话上下文，避免与正常聊天串味。
 - 记忆分层：`normal` 与 `cheatsheet` 独立，可用 `--action memory --scope normal|cheatsheet` 查看。
+- 在 cheatsheet 聊天里，若用户提到明确事实/经历/纠正（如学历、家庭背景、财富、关系、偏好），会自动沉淀到背景记忆，并同步更新 `SKILL.md` 的八字联动分析区。
 - `mode off` clears cheatsheet session context to avoid mixing with normal chat.
 - Memory is layered: `normal` and `cheatsheet` are isolated.
 
@@ -160,6 +177,78 @@ npm run bazi -- --action compat \
 npm run bazi -- --action memory --slug "shi-li-ren-wu" --op list
 ```
 
+补充：如果你在普通更新流里只想“随聊随记”，可直接用单句消息：
+
+```bash
+npm run bazi -- --action update --slug "shi-li-ren-wu" --message "她工作很拼，压力下会先卡边界。"
+```
+
+10. 同步到 Claude Code / OpenClaw Agent（推荐）
+
+一键开启（带引导，推荐）：
+
+```bash
+npm run bazi:agent:enable
+```
+
+说明：
+- 该命令会先展示将要写入的目标目录，再让用户确认是否执行。
+- 执行后会自动把 persona 写入 Claude Code / OpenClaw 对应 agent 目录。
+- 在 CI 或非交互环境可直接执行：
+
+```bash
+npm run bazi:agent:enable -- --yes true
+```
+
+高级命令（可选）：
+
+先看将写入哪些目录：
+
+```bash
+npm run bazi:agent:list
+```
+
+直接同步全部 persona 到两个平台：
+
+```bash
+npm run bazi:agent:sync
+```
+
+只同步到 Claude Code：
+
+```bash
+npm run bazi:agent:sync:claude
+```
+
+只同步到 OpenClaw：
+
+```bash
+npm run bazi:agent:sync:openclaw
+```
+
+仅同步某一个 persona：
+
+```bash
+npm run bazi:agent:sync -- --slug "shi-li-ren-wu"
+```
+
+说明：
+- 对用户展示时统一叫 **ID**，系统内部仍使用 `slug` 参数（保持兼容）。
+- 也就是：`ID = slug`。
+
+默认路径规则：
+- Claude Code: `~/.claude/agents/bazi-persona/`
+- OpenClaw: `~/.openclaw/agents/bazi-persona/`
+- 每个 persona 生成一个独立 agent 文件，并生成一个 `bazi-persona-router.md`
+
+你也可以覆盖路径（用于团队共享或沙盒）：
+
+```bash
+npm run bazi:agent:sync -- \
+  --claude-home "/custom/.claude" \
+  --openclaw-home "/custom/.openclaw"
+```
+
 7. 卸载测试数据（可选）
 
 ```bash
@@ -169,29 +258,23 @@ npm run bazi -- --action delete \
   --confirm-2 shi-li-ren-wu
 ```
 
-## 命令体系
+## 常用命令
 
-- 主命令：`/create-bazi-persona`
-- 主命令：`/update-bazi-persona {slug}`
-- 主命令：`/list-bazi-personas`
-- 主命令：`/bazi-persona-rollback {slug} {version}`
-- 主命令：`/delete-bazi-persona {slug}`
-- 主命令：`/query-bazi-flow {slug} {datetime?}`
-- 主命令：`/bazi-cheatsheet {slug}`
-- 主命令：`/bazi-compat {slugA} {slugB}`
-- 主命令：`/memory-{list|pin|unpin|forget|merge} {slug}`
+统一入口：`/bazi-persona`
 
-友好别名（同义触发）：
+- `/bazi-persona create`
+- `/bazi-persona list`
+- `/bazi-persona {id}`（示例：`/bazi-persona xiao-mei`）
+- `/bazi-persona update {id}`
+- `/bazi-persona cheatsheet {id}`
+- `/bazi-persona flow {id}`
 
-- `/create-bazi`
-- `/update-bazi`
-- `/list-bazi`
-- `/rollback-bazi`
-- `/delete-bazi`
-- `/flow-bazi`
-- `/cheatsheet-bazi`
-- `/compat-bazi`
-- `/memory-bazi`
+查看全部命令：
+
+- `/bazi-persona help`
+
+说明：
+- 文档里对用户展示统一叫 `ID`，内部参数仍是 `slug`（兼容历史实现）。
 
 ## 目录结构
 
@@ -218,6 +301,7 @@ bazi-persona-skill/
 │   │   ├── chat_parser.ts
 │   │   └── text_ingest.ts
 │   ├── runtime/
+│   │   ├── agent_bridge.ts
 │   │   ├── meta_updater.ts
 │   │   └── version_manager.ts
 │   └── utils/

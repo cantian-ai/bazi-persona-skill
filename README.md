@@ -1,4 +1,6 @@
-# Bazi Persona Skill — AI persona powered by Chinese astrology
+# 八字人格 (Bazi Persona)
+
+**Bazi Persona Skill — AI persona powered by Chinese astrology**
 
 **一个生日，一个活的人格。** 基于八字命理，生成会聊天、有情绪、会随时间变化的 AI 人格。
 
@@ -375,6 +377,26 @@ bazi --action help
 ```text
 /bazi-persona agent remove
 ```
+
+
+## 关于我们
+
+参天AI致力于把传统东方智慧和AI做充分结合，从八字出发，打造更懂你的AI。
+我们的网站：https://cantian.ai
+
+关联项目：
+[OpenClaw Skills](https://clawhub.ai/tianlinle/cantian-bazi)
+[Bazi MCP](https://github.com/cantian-ai/bazi-mcp)
+[GPTs - Chinese Bazi Fortune Teller](https://chatgpt.com/g/g-67c3f7b74d148191a2167f44fd13412d-chinese-bazi-fortune-teller-can-tian-ba-zi-suan-ming-jing-zhun-pai-pan-jie-du)
+[iOS App - 参天AI](https://apps.apple.com/app/id6746296534)
+
+## 联系我们
+
+- **邮箱**：[support@cantian.ai](mailto:support@cantian.ai)
+- **微信**：
+
+  <img src="https://github.com/user-attachments/assets/7790b64e-e03f-47e2-b824-38459549a6d8" alt="WeChat QR Code" width="200"/>
+
 
 
 ## License

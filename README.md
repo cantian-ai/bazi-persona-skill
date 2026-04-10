@@ -162,18 +162,35 @@
     团队磨合期她会显得有点严，但这是她建立秩序的方式。
 ```
 
-你也可以直接丢一段聊天记录或文本资料，系统会自动提取语言习惯、性格线索，让人格更逼真：
+你也可以直接丢截图、聊天记录、文档，系统会自动提取信息并更新人格：
 
 ```
-👤  我把和小A的微信聊天记录导出来了，帮我更新一下她的人格
+👤  [粘贴了一张和小A的微信聊天截图]
 
-🤖  解析完成 ✓
-    - 326 条消息，短句快节奏
-    - 口头禅提取："行"、"再说"、"你定"
-    - 标点习惯：几乎不用感叹号，句号偏多
-    - 沟通风格：倾向快速确认并推进，压力下先保交付再解释
+🤖  从截图里提取到 12 条小A的发言，我看到的内容：
+    - "行"、"再说吧"、"你定就好"
+    - 回复都很短，几乎不用感叹号
+    - 你问了三个问题她只回了最后一个
 
-    已同步到人格模型，后续对话会更接近她的真实表达方式。
+    要把这些写入她的人格模型吗？
+
+👤  写入吧
+
+🤖  已更新 ✓
+    语言习惯已同步：短句快节奏、结论导向、不做情绪回应。
+    后续对话会更接近她的真实表达方式。
+```
+
+```
+👤  [粘贴了小A的朋友圈截图]
+
+🤖  从截图里我看到：
+    - 上周去了日本旅行，发了 3 张京都的照片
+    - 配文风格很简短："📍京都"，没有长文案
+    - 上一条朋友圈是两个月前
+
+    这些信息可以补充到人格里——发朋友圈频率低、配文极简、
+    有独立出行的习惯。要写入吗？
 ```
 
 ---
@@ -211,27 +228,54 @@ Bazi Persona Skill：
 
 ## Quick Start / 快速开始
 
-### 在 Claude Code 中使用（推荐）
+### Step 1：安装
 
-1. 安装 Skill
+在 Claude Code 或 OpenClaw 的对话框里粘贴这句话：
+
+> 帮我执行 `npx skills add cantian-ai/bazi-persona-skill --skill bazi-persona -a claude-code --copy -y` 安装八字人格技能
+
+或者你自己在终端执行：
 
 ```bash
-npx skills add bazi-persona-skill --skill bazi-persona -a claude-code --copy -y
+npx skills add cantian-ai/bazi-persona-skill --skill bazi-persona -a claude-code --copy -y
 ```
 
-2. 直接对话，说人话就行
+安装完成后，你的 AI 就拥有了八字人格能力。
+
+### Step 2：创建第一个人格
+
+回到对话框，直接说：
 
 ```text
-帮我创建八字人格：小A，1996年8月12日下午3点半，上海，女，同事
+帮我创建八字人格：小A，女，96年8月12日下午3点半，上海人，我同事
 ```
 
-### 在 OpenClaw 中使用
+AI 会自动排盘、生成人格预览、进入对话模式。
 
-安装方式相同，Skill 自动适配 OpenClaw 平台。
+### Step 3：开始使用
 
-### 通过 npm 命令行使用
+创建完成后，你可以直接和人格聊天：
+
+```text
+你最近工作忙吗？
+```
+
+想深度分析，说一句：
+
+```text
+打开作弊模式
+```
+
+想创建更多人格，随时说：
+
+```text
+再帮我创建一个：小B，男，91年3月12日中午，广州，朋友
+```
+
+### 其他安装方式
 
 ```bash
+# 全局安装 CLI（不依赖 Agent 平台）
 npm install -g bazi-persona-skill
 bazi --action help
 ```
@@ -261,29 +305,63 @@ bazi --action help
 
 ## Agent Integration / 平台集成
 
-将人格同步为 Agent 文件，在 Claude Code 或 OpenClaw 中直接以人格身份启动对话：
+创建好的人格可以同步为 Agent 文件，之后不用每次都进 Skill，直接在平台里点名就能开始对话。
+
+### 1. 同步人格到平台
+
+在对话里说一句：
+
+```text
+把我的人格同步到 Claude Code
+```
+
+或用命令：
 
 ```text
 /bazi-persona agent enable
 ```
+
+系统会自动把所有已创建的人格写入 Agent 目录：
 
 | 平台 | Agent 目录 |
 |---|---|
 | Claude Code | `~/.claude/agents/bazi-persona/` |
 | OpenClaw | `~/.openclaw/agents/bazi-persona/` |
 
-同步后直接点名角色名称或 ID 开始对话。
+每个人格生成一个独立 Agent 文件，外加一个路由文件自动分发。
 
----
+### 2. 同步后怎么用
 
-## Development / 开发
+同步完成后，打开一个新对话，直接说人名就行：
 
-```bash
-git clone https://github.com/cantian-ai/bazi-persona-skill.git
-cd bazi-persona-skill
-npm install
-npm run build
 ```
+👤  小A
+
+🤖  我在。怎么了？
+```
+
+```
+👤  切换到小B
+
+🤖  来了来了，有什么事？
+```
+
+不需要再执行安装或 `/bazi-persona` 命令，Agent 文件会让平台自动识别并加载对应人格。
+
+### 3. 保持同步
+
+每次你创建新人格或更新了已有人格，重新同步一次就行：
+
+```text
+帮我重新同步人格到 Agent
+```
+
+或删除所有已同步的 Agent：
+
+```text
+/bazi-persona agent remove
+```
+
 
 ## License
 

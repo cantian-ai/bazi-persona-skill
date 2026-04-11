@@ -477,7 +477,10 @@ function stateReference(record: PersonaRecord, ...labels: string[]): string {
 
 function pickPrimaryTenGod(chart: BaziChart): string {
   const direct = summarizeValue(chart.ten_gods);
-  return direct || "未识别";
+  if (!direct) {
+    throw new Error("Primary ten-god is missing from Bazi chart.");
+  }
+  return direct;
 }
 
 function pickCurrentLuck(chart: BaziChart): string {
@@ -490,13 +493,16 @@ function pickCurrentLuck(chart: BaziChart): string {
     return Number.isFinite(start) && Number.isFinite(end) && currentYear >= start && currentYear <= end;
   });
   if (!matched) {
-    return "未识别当前大运";
+    throw new Error("Current luck cycle is missing from Bazi chart.");
   }
   const pillar = summarizeValue(matched["干支"]);
   const tenGod = summarizeValue(matched["天干十神"]);
   const start = summarizeValue(matched["开始年份"]);
   const end = summarizeValue(matched["结束"]);
-  return `${pillar}（${start}-${end}，天干十神：${tenGod || "未提取"}）`;
+  if (!pillar || !start || !end || !tenGod) {
+    throw new Error("Current luck cycle details are incomplete.");
+  }
+  return `${pillar}（${start}-${end}，天干十神：${tenGod}）`;
 }
 
 function extractRealityFacts(memory: PersonaMemoryEntry[]): string[] {
@@ -721,18 +727,29 @@ export function buildBaziEvidence(params: {
   references: ReferenceBlocks;
 } {
   const { chart, knowledge } = params;
-  const dayMaster = chart.day_master?.trim() || "未识别";
-  const elementKey = knowledge.stem_to_element[dayMaster] ?? "未知";
-  const elementProfile = knowledge.element_profiles[elementKey] ?? knowledge.element_profiles["未知"];
+  const dayMaster = chart.day_master?.trim();
+  if (!dayMaster) {
+    throw new Error("Day master is missing from Bazi chart.");
+  }
+  const elementKey = knowledge.stem_to_element[dayMaster];
+  if (!elementKey) {
+    throw new Error(`Element mapping missing for day master: ${dayMaster}`);
+  }
+  const elementProfile = knowledge.element_profiles[elementKey];
+  if (!elementProfile) {
+    throw new Error(`Element profile missing for element: ${elementKey}`);
+  }
   const primaryTenGod = pickPrimaryTenGod(chart);
-  const tenGodBehavior =
-    knowledge.ten_god_behaviors[primaryTenGod] ??
-    knowledge.fallback_ten_god_behavior;
+  const tenGodBehavior = knowledge.ten_god_behaviors[primaryTenGod];
+  if (!tenGodBehavior) {
+    throw new Error(`Ten-god behavior mapping missing: ${primaryTenGod}`);
+  }
   const currentLuck = pickCurrentLuck(chart);
   const fiveElementSummary = summarizeValue(chart.five_elements) || "未提取";
-  const shift =
-    knowledge.state_shift_by_ten_god[primaryTenGod] ??
-    knowledge.default_state_shift;
+  const shift = knowledge.state_shift_by_ten_god[primaryTenGod];
+  if (!shift) {
+    throw new Error(`State shift mapping missing for ten-god: ${primaryTenGod}`);
+  }
   const facts = extractRealityFacts(params.memory);
   const relationshipLens = (params.activeRelationships[0] ?? params.relationships[0] ?? "").trim();
   const effectiveRelationshipLens = relationshipLens || "当前互动";

@@ -113,12 +113,6 @@ export interface PersonaKnowledge {
     communication: string;
     stress: string;
   }>;
-  fallback_ten_god_behavior: {
-    trait: string;
-    decision: string;
-    communication: string;
-    stress: string;
-  };
   reference_guidance: {
     communication_title: string;
     persona_writing_tip: string;
@@ -132,11 +126,6 @@ export interface PersonaKnowledge {
     communication: string;
     decision: string;
   }>;
-  default_state_shift: {
-    summary: string;
-    communication: string;
-    decision: string;
-  };
 }
 
 export interface RoutedIntent {

@@ -1,0 +1,3 @@
+# Publishing is controlled by package.json "files".
+# Keeping this file prevents npm from inheriting .gitignore rules
+# like "dist", which would otherwise exclude runtime artifacts.

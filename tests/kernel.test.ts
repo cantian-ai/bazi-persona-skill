@@ -347,6 +347,13 @@ test("calendar parser handles relative natural-language dates", () => {
   assert.ok(parsed.day >= 1 && parsed.day <= 31);
 });
 
+test("prompt knowledge does not define default persona or default state fallbacks", () => {
+  const knowledgeMarkdown = fs.readFileSync(path.resolve("prompts/knowledge.md"), "utf8");
+  assert.doesNotMatch(knowledgeMarkdown, /fallback_ten_god_behavior/);
+  assert.doesNotMatch(knowledgeMarkdown, /default_state_shift/);
+  assert.doesNotMatch(knowledgeMarkdown, /"未知"\s*:/);
+});
+
 test.after(() => {
   resetKnowledgeCache();
 });

@@ -74,7 +74,6 @@ export function loadPersonaKnowledge(knowledgeSource = PROMPT_KNOWLEDGE_FILE): P
     !knowledge.stem_to_element ||
     !knowledge.element_profiles ||
     !knowledge.ten_god_behaviors ||
-    !knowledge.fallback_ten_god_behavior ||
     !knowledge.reference_guidance
   ) {
     throw new Error("Persona knowledge is incomplete.");

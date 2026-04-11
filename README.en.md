@@ -195,71 +195,50 @@ Use `/bazi-persona` in Claude Code / OpenClaw, or just talk naturally.
 
 | What you want | Command | Natural language |
 |---|---|---|
-| Create persona | `/bazi-persona create` | "Create a Bazi persona: Amy, female, 1996..." |
-| List all | `/bazi-persona list` | "What personas do I have?" |
-| Enter chat | `/bazi-persona {id}` | "I want to talk to Amy" |
-| Add info | `/bazi-persona update {id}` | "Amy got promoted, update her" |
-| Cheat mode | `/bazi-persona cheatsheet {id}` | "Turn on cheat mode" |
-| Time fortune | `/bazi-persona flow {id}` | "How's Amy doing lately?" |
-| Compatibility | `/bazi-persona compat {a} {b}` | "Compare Amy and Bob" |
-| Calendar | `/bazi-persona calendar` | "What does today's almanac say?" |
-| Sync Agent | `/bazi-persona agent enable` | "Sync personas to Claude Code" |
-| Help | `/bazi-persona help` | "What commands are there?" |
+| Create persona | `/bazi-persona` | "Create a Bazi persona: Amy, female, 1996..." |
+| List stored personas | `bazi --action inspect` | "What personas do I have?" |
+| Inspect one local persona file | `bazi --action inspect --slug amy` | "Show me Amy's persona file" |
+| Delete one local persona file | `bazi --action delete --slug amy` | "Delete Amy's persona" |
+| Start chatting | `/bazi-persona` | "I want to talk to Amy" |
+| Add info | `/bazi-persona` | "Amy got promoted, update her" |
+| Turn on cheat mode | `/bazi-persona` | "While talking to Amy, just say: Turn on cheat mode" |
+| Calendar | `/bazi-persona` | "What does today's almanac say?" |
+| Help | `bazi --action help` | "What usage is available?" |
 
-Supports Chinese and English. Defaults to your input language. Use `--lang zh` / `--lang en` to switch.
+By default, the skill follows the user's current input language. If the language is unclear, it starts in Chinese.
 
 ---
 
 ## Agent Integration
 
-Created personas can be synced as Agent files.  
-After syncing, just say someone's name in the platform — no need to enter the Skill each time.
+The current version does not require a separate Agent sync step.  
+In Claude Code / OpenClaw, you can create, update, chat, and analyze directly through `/bazi-persona` or natural language.
 
-### Sync personas to your platform
+If you are already talking to a persona and want to explicitly switch into analysis mode, just say:
 
 ```text
-Sync my personas to Claude Code
+Turn on cheat mode
 ```
 
-Or use the command:
+To switch back to normal chat, say:
 
 ```text
-/bazi-persona agent enable
+Turn off cheat mode
 ```
 
-The system writes all personas to the Agent directory:
-
-| Platform | Agent Directory |
-|---|---|
-| Claude Code | `~/.claude/agents/bazi-persona/` |
-| OpenClaw | `~/.openclaw/agents/bazi-persona/` |
-
-### After syncing
+Created personas are stored locally:
 
 ```text
-👤 Amy
-
-🤖 I'm here. What's up?
+personas/<slug>/persona.json
+personas/<slug>/SKILL.md
 ```
 
-```text
-👤 Switch to Bob
+If you want to inspect or clean up those local files, use:
 
-🤖 Hey, what do you need?
-```
-
-### Re-sync
-
-Whenever you create or update personas, just re-sync:
-
-```text
-Re-sync my personas to Agent
-```
-
-Or remove all synced Agents:
-
-```text
-/bazi-persona agent remove
+```bash
+bazi --action inspect
+bazi --action inspect --slug amy
+bazi --action delete --slug amy
 ```
 
 ---

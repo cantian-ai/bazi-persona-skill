@@ -195,71 +195,50 @@ Claude Code / OpenClaw で `/bazi-persona` を使うか、自然言語でその�
 
 | やりたいこと | コマンド | 自然言語 |
 |---|---|---|
-| ペルソナ作成 | `/bazi-persona create` | 「八字ペルソナを作って：花子、女性、1996年…」 |
-| 一覧 | `/bazi-persona list` | 「ペルソナ一覧見せて」 |
-| 会話開始 | `/bazi-persona {id}` | 「花子と話したい」 |
-| 情報追加 | `/bazi-persona update {id}` | 「花子が昇進した、更新して」 |
-| チートモード | `/bazi-persona cheatsheet {id}` | 「チートモードON」 |
-| 運勢確認 | `/bazi-persona flow {id}` | 「花子の最近の調子は？」 |
-| 相性分析 | `/bazi-persona compat {a} {b}` | 「花子と太郎の相性は？」 |
-| 暦 | `/bazi-persona calendar` | 「今日の暦は？」 |
-| Agent同期 | `/bazi-persona agent enable` | 「ペルソナをClaude Codeに同期」 |
-| ヘルプ | `/bazi-persona help` | 「コマンド一覧」 |
+| ペルソナ作成 | `/bazi-persona` | 「八字ペルソナを作って：花子、女性、1996年…」 |
+| 保存済み一覧を見る | `bazi --action inspect` | 「保存済みのペルソナを見せて」 |
+| ローカルの1件を見る | `bazi --action inspect --slug hanako` | 「花子の人格ファイルを見せて」 |
+| ローカルの1件を削除 | `bazi --action delete --slug hanako` | 「花子の人格を削除して」 |
+| 会話開始 | `/bazi-persona` | 「花子と話したい」 |
+| 情報追加 | `/bazi-persona` | 「花子が昇進した、更新して」 |
+| チートモードを開く | `/bazi-persona` | 「花子との会話中に『チートモードをオンにして』と言う」 |
+| 暦 | `/bazi-persona` | 「今日の暦は？」 |
+| ヘルプ | `bazi --action help` | 「使い方を教えて」 |
 
-日本語・中国語・英語に対応。入力言語に自動追従、`--lang zh` / `--lang en` で切替可能。
+基本はユーザーの入力言語に追従します。判定が曖昧なときは先に中国語で始めます。
 
 ---
 
 ## Agent 連携 Agent Integration
 
-作成したペルソナを Agent ファイルとして同期できます。  
-同期後はプラットフォームで名前を呼ぶだけ — 毎回 Skill に入る必要はありません。
+現在のバージョンでは、別途 Agent 同期は不要です。  
+Claude Code / OpenClaw では `/bazi-persona` または自然言語だけで、作成・更新・会話・分析まで行えます。
 
-### ペルソナをプラットフォームに同期
+すでにある人格と会話していて、明示的に分析視点へ切り替えたいときは、こう言ってください：
 
 ```text
-ペルソナをClaude Codeに同期して
+チートモードをオンにして
 ```
 
-またはコマンド：
+通常会話へ戻したいときは：
 
 ```text
-/bazi-persona agent enable
+チートモードをオフにして
 ```
 
-システムが全ペルソナを Agent ディレクトリに書き出します：
-
-| プラットフォーム | Agent ディレクトリ |
-|---|---|
-| Claude Code | `~/.claude/agents/bazi-persona/` |
-| OpenClaw | `~/.openclaw/agents/bazi-persona/` |
-
-### 同期後の使い方
+作成したペルソナはローカルに保存されます：
 
 ```text
-👤 花子
-
-🤖 はい。なに？
+personas/<slug>/persona.json
+personas/<slug>/SKILL.md
 ```
 
-```text
-👤 太郎に切り替えて
+これらのローカルファイルを確認・整理したい場合は、次を使います：
 
-🤖 はいはい、何かあった？
-```
-
-### 再同期
-
-新しいペルソナを作成したり、既存のペルソナを更新した後は、再同期するだけ：
-
-```text
-ペルソナをAgentに再同期して
-```
-
-または同期済み Agent をすべて削除：
-
-```text
-/bazi-persona agent remove
+```bash
+bazi --action inspect
+bazi --action inspect --slug hanako
+bazi --action delete --slug hanako
 ```
 
 ---

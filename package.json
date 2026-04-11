@@ -1,18 +1,14 @@
 {
   "name": "bazi-persona-skill",
-  "version": "0.1.5",
-  "description": "八字人格 — 基于八字命理生成有趣的AI人格",
+  "version": "0.2.0",
+  "description": "Prompt-first Bazi persona skill kernel",
   "type": "module",
-  "main": "./dist/core/skill_writer.js",
-  "types": "./dist/core/skill_writer.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/core/skill_writer.js",
-      "types": "./dist/core/skill_writer.d.ts"
-    },
-    "./bazi": {
-      "import": "./dist/core/bazi_calc.js",
-      "types": "./dist/core/bazi_calc.d.ts"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "bin": {
@@ -25,6 +21,10 @@
     "prompts",
     "SKILL.md",
     "README.md",
+    "README.en.md",
+    "README.ja.md",
+    "README.ko.md",
+    "README.zh-TW.md",
     "LICENSE"
   ],
   "engines": {
@@ -49,31 +49,11 @@
   "license": "MIT",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/**/*.test.ts",
     "prepublishOnly": "npm run build",
-    "bazi": "node dist/core/skill_writer.js",
-    "bazi:init": "node dist/core/skill_writer.js --action create",
-    "bazi:update": "node dist/core/skill_writer.js --action update",
-    "bazi:list": "node dist/core/skill_writer.js --action list",
-    "bazi:flow": "node dist/core/skill_writer.js --action flow",
-    "bazi:ingest": "node dist/core/skill_writer.js --action ingest",
-    "bazi:cheatsheet": "node dist/core/skill_writer.js --action cheatsheet",
-    "bazi:compat": "node dist/core/skill_writer.js --action compat",
-    "bazi:memory": "node dist/core/skill_writer.js --action memory",
-    "bazi:delete": "node dist/core/skill_writer.js --action delete",
-    "bazi:rollback": "node dist/core/skill_writer.js --action rollback",
-    "bazi:calendar": "node dist/core/skill_writer.js --action calendar",
-    "bazi:help": "node dist/core/skill_writer.js --action help",
-    "bazi:agent:enable": "node dist/runtime/agent_bridge.js --action enable --target all",
-    "bazi:agent:list": "node dist/runtime/agent_bridge.js --action list --target all",
-    "bazi:agent:sync": "node dist/runtime/agent_bridge.js --action sync --target all",
-    "bazi:agent:sync:claude": "node dist/runtime/agent_bridge.js --action sync --target claude",
-    "bazi:agent:sync:openclaw": "node dist/runtime/agent_bridge.js --action sync --target openclaw",
-    "bazi:agent:sync:hermes": "node dist/runtime/agent_bridge.js --action sync --target hermes",
-    "bazi:agent:remove": "node dist/runtime/agent_bridge.js --action remove --target all --confirm DELETE",
-    "dev": "tsx tools/core/skill_writer.ts",
-    "dev:calc": "tsx tools/core/bazi_calc.ts",
-    "dev:agent": "tsx tools/runtime/agent_bridge.ts"
+    "bazi": "node dist/cli.js",
+    "dev": "tsx src/cli.ts"
   },
   "dependencies": {
     "cantian-tymext": "^0.0.26",

@@ -195,71 +195,50 @@ npx skills add cantian-ai/bazi-persona-skill
 
 | 你想做什麼 | 指令 | 自然語言 |
 |---|---|---|
-| 建立人格 | `/bazi-persona create` | 幫我建立八字人格：小A，女，1996年…… |
-| 查看所有人格 | `/bazi-persona list` | 我有哪些人格？ |
-| 進入對話 | `/bazi-persona {id}` | 我要跟小A聊天 |
-| 補充資訊 | `/bazi-persona update {id}` | 小A最近升職了，幫我更新 |
-| 打開作弊模式 | `/bazi-persona cheatsheet {id}` | 打開作弊模式 |
-| 時運查詢 | `/bazi-persona flow {id}` | 小A最近狀態怎樣？ |
-| 合盤分析 | `/bazi-persona compat {a} {b}` | 小A和小B合盤 |
-| 萬年曆 | `/bazi-persona calendar` | 今天黃曆怎麼樣？ |
-| 同步 Agent | `/bazi-persona agent enable` | 把人格同步到 Claude Code |
-| 幫助 | `/bazi-persona help` | 有哪些指令？ |
+| 建立人格 | `/bazi-persona` | 幫我建立八字人格：小A，女，1996年…… |
+| 查看已存人格 | `bazi --action inspect` | 我有哪些人格？ |
+| 查看單一人格檔案 | `bazi --action inspect --slug xiao-a` | 看看小A的人設檔案 |
+| 刪除單一人格檔案 | `bazi --action delete --slug xiao-a` | 刪掉小A這個人格 |
+| 進入對話 | `/bazi-persona` | 我要跟小A聊天 |
+| 補充資訊 | `/bazi-persona` | 小A最近升職了，幫我更新 |
+| 打開作弊模式 | `/bazi-persona` | 進入當前人格對話後，直接說：「打開作弊模式」 |
+| 萬年曆 | `/bazi-persona` | 今天黃曆怎麼樣？ |
+| 幫助 | `bazi --action help` | 有哪些用法？ |
 
-支援中英雙語，預設跟隨你的輸入語言，也可用 `--lang zh` / `--lang en` 切換。
+預設跟隨使用者當前輸入語言；如果語言判斷不明確，就先用中文。
 
 ---
 
 ## Agent 整合 Agent Integration
 
-建立好的人格可以同步為 Agent 檔案。  
-同步後，不用每次都進 Skill，直接在平台裡點名就能開始對話。
+目前版本不需要額外同步 Agent 檔案。  
+在 Claude Code / OpenClaw 裡，直接透過 `/bazi-persona` 或自然語言就可以建立、更新、對話和分析。
 
-### 同步人格到平台
+如果你已經在和某個人格對話，想明確切到分析視角，直接說：
 
 ```text
-把我的人格同步到 Claude Code
+打開作弊模式
 ```
 
-或使用指令：
+想切回正常聊天，就說：
 
 ```text
-/bazi-persona agent enable
+關閉作弊模式
 ```
 
-系統會自動把所有已建立的人格寫入 Agent 目錄：
-
-| 平台 | Agent 目錄 |
-|---|---|
-| Claude Code | `~/.claude/agents/bazi-persona/` |
-| OpenClaw | `~/.openclaw/agents/bazi-persona/` |
-
-### 同步後怎麼用
+已建立的人格會保存在本地：
 
 ```text
-👤 小A
-
-🤖 我在。怎麼了？
+personas/<slug>/persona.json
+personas/<slug>/SKILL.md
 ```
 
-```text
-👤 切換到小B
+如果你想查看或整理這些本地檔案，可以使用：
 
-🤖 來了，有什麼事？
-```
-
-### 重新同步
-
-當你建立了新人格，或者更新了已有人格後，重新同步一次即可：
-
-```text
-幫我重新同步人格到 Agent
-```
-
-或刪除所有已同步的 Agent：
-
-```text
-/bazi-persona agent remove
+```bash
+bazi --action inspect
+bazi --action inspect --slug xiao-a
+bazi --action delete --slug xiao-a
 ```
 
 ---

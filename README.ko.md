@@ -195,71 +195,50 @@ Claude Code / OpenClaw에서 `/bazi-persona`를 사용하거나, 자연어로 �
 
 | 하고 싶은 것 | 명령어 | 자연어 |
 |---|---|---|
-| 페르소나 생성 | `/bazi-persona create` | "사주 페르소나 만들어줘: 수진, 여자, 1996…" |
-| 목록 보기 | `/bazi-persona list` | "내 페르소나 목록 보여줘" |
-| 대화 시작 | `/bazi-persona {id}` | "수진이랑 대화하고 싶어" |
-| 정보 추가 | `/bazi-persona update {id}` | "수진이 승진했어, 업데이트해줘" |
-| 치트 모드 | `/bazi-persona cheatsheet {id}` | "치트 모드 켜줘" |
-| 운세 확인 | `/bazi-persona flow {id}` | "수진이 최근 운세는?" |
-| 궁합 분석 | `/bazi-persona compat {a} {b}` | "수진이와 민수 궁합 봐줘" |
-| 달력 | `/bazi-persona calendar` | "오늘 황력은?" |
-| Agent 동기화 | `/bazi-persona agent enable` | "페르소나를 Claude Code에 동기화" |
-| 도움말 | `/bazi-persona help` | "명령어 목록" |
+| 페르소나 생성 | `/bazi-persona` | "사주 페르소나 만들어줘: 수진, 여자, 1996…" |
+| 저장된 목록 보기 | `bazi --action inspect` | "내 페르소나 목록 보여줘" |
+| 로컬 파일 한 건 보기 | `bazi --action inspect --slug sujin` | "수진 페르소나 파일 보여줘" |
+| 로컬 파일 한 건 삭제 | `bazi --action delete --slug sujin` | "수진 페르소나 삭제해줘" |
+| 대화 시작 | `/bazi-persona` | "수진이랑 대화하고 싶어" |
+| 정보 추가 | `/bazi-persona` | "수진이 승진했어, 업데이트해줘" |
+| 치트 모드 켜기 | `/bazi-persona` | "수진과 대화 중에 '치트 모드 켜줘'라고 말하기" |
+| 달력 | `/bazi-persona` | "오늘 황력은?" |
+| 도움말 | `bazi --action help` | "사용법 알려줘" |
 
-한국어, 중국어, 영어 지원. 입력 언어를 자동 감지하며, `--lang zh` / `--lang en`으로 전환 가능.
+기본적으로 사용자의 현재 입력 언어를 따릅니다. 언어가 애매하면 먼저 중국어로 시작합니다.
 
 ---
 
 ## Agent 통합 Agent Integration
 
-생성한 페르소나를 Agent 파일로 동기화할 수 있습니다.  
-동기화 후에는 플랫폼에서 이름만 부르면 됩니다 — 매번 Skill에 들어갈 필요 없습니다.
+현재 버전은 별도의 Agent 동기화가 필요 없습니다.  
+Claude Code / OpenClaw에서는 `/bazi-persona` 또는 자연어만으로 생성, 업데이트, 대화, 분석까지 바로 할 수 있습니다.
 
-### 페르소나를 플랫폼에 동기화
+이미 어떤 페르소나와 대화 중이고, 명확하게 분석 시점으로 전환하고 싶다면 이렇게 말하세요:
 
 ```text
-내 페르소나를 Claude Code에 동기화해줘
+치트 모드 켜줘
 ```
 
-또는 명령어 사용:
+다시 일반 대화로 돌아가고 싶다면:
 
 ```text
-/bazi-persona agent enable
+치트 모드 꺼줘
 ```
 
-시스템이 모든 페르소나를 Agent 디렉토리에 자동 저장합니다:
-
-| 플랫폼 | Agent 디렉토리 |
-|---|---|
-| Claude Code | `~/.claude/agents/bazi-persona/` |
-| OpenClaw | `~/.openclaw/agents/bazi-persona/` |
-
-### 동기화 후 사용 방법
+생성된 페르소나는 로컬에 저장됩니다:
 
 ```text
-👤 수진
-
-🤖 나야. 왜?
+personas/<slug>/persona.json
+personas/<slug>/SKILL.md
 ```
 
-```text
-👤 민수로 전환
+이 로컬 파일을 확인하거나 정리하려면 다음을 사용하세요:
 
-🤖 왔어, 무슨 일이야?
-```
-
-### 재동기화
-
-새 페르소나를 만들거나 기존 페르소나를 업데이트한 후 재동기화하면 됩니다:
-
-```text
-페르소나를 Agent에 다시 동기화해줘
-```
-
-또는 동기화된 Agent 전부 삭제:
-
-```text
-/bazi-persona agent remove
+```bash
+bazi --action inspect
+bazi --action inspect --slug sujin
+bazi --action delete --slug sujin
 ```
 
 ---

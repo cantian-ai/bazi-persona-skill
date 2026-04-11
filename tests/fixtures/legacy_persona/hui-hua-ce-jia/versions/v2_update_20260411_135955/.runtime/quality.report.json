@@ -1,0 +1,34 @@
+{
+  "version": "v1",
+  "ts": "2026-04-11T05:53:05.406Z",
+  "mode": "update",
+  "pass": true,
+  "score": 100,
+  "dimensions": [
+    {
+      "key": "persona_runtime_structure",
+      "pass": true,
+      "detail": "persona 包含 runtime 协议结构。"
+    },
+    {
+      "key": "state_runtime_structure",
+      "pass": true,
+      "detail": "state 包含动态偏移与约束。"
+    },
+    {
+      "key": "preview_completeness",
+      "pass": true,
+      "detail": "五维预览完整。"
+    },
+    {
+      "key": "no_default_preview_token",
+      "pass": true,
+      "detail": "未发现 DEFAULT_PREVIEW 占位残留。"
+    },
+    {
+      "key": "evidence_linkage",
+      "pass": true,
+      "detail": "人格协议已包含补充资料接入位。"
+    }
+  ]
+}

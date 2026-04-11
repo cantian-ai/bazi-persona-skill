@@ -8,9 +8,10 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
     "types": ["node"]
   },
-  "include": ["tools/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

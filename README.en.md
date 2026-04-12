@@ -59,7 +59,12 @@ Paste this in any AI Agent chat:
 
 If you use **OpenClaw**, the easiest way is to install it directly from ClawHub:
 
-> Open [ClawHub · bazi-persona](https://clawhub.ai/xiaojxiao2021/bazi-persona) and follow the instructions on the page
+```bash
+clawhub install bazi-persona
+```
+
+ClawHub page:
+https://clawhub.ai/xiaojxiao2021/bazi-persona
 
 Or run it yourself in the terminal:
 

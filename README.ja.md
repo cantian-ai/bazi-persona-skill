@@ -59,7 +59,12 @@ Bazi Persona Skill is an AI persona generator based on birth date for Claude Cod
 
 **OpenClaw** で使う場合は、ClawHub から直接インストールするのがいちばん簡単です：
 
-> [ClawHub · bazi-persona](https://clawhub.ai/xiaojxiao2021/bazi-persona) を開いて、ページの案内に従ってインストールしてください
+```bash
+clawhub install bazi-persona
+```
+
+ClawHub ページ：
+https://clawhub.ai/xiaojxiao2021/bazi-persona
 
 またはターミナルで直接実行：
 

@@ -1,0 +1,45 @@
+name: Build OpenClaw Bundle
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "openclaw/**"
+      - "scripts/build-openclaw-release.sh"
+      - "src/**"
+      - "bin/**"
+      - "prompts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build OpenClaw release bundle
+        run: npm run build:openclaw
+
+      - name: Upload OpenClaw artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openclaw-bazi-persona
+          path: release/openclaw/bazi-persona

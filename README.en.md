@@ -59,10 +59,10 @@ Paste this in any AI Agent chat:
 Run `npx skills add cantian-ai/bazi-persona-skill --all` to install the Bazi persona skill
 ```
 
-If you use **OpenClaw**, the easiest way is to install it directly from ClawHub:
+If you use **OpenClaw**, the recommended path is the native OpenClaw installer:
 
 ```bash
-clawhub install bazi-persona
+openclaw skills install bazi-persona
 ```
 
 ClawHub page:
@@ -271,7 +271,7 @@ Website: https://cantian.ai
 
 Related projects:
 
-1. [OpenClaw Skills](https://clawhub.ai/tianlinle/cantian-bazi)
+1. [OpenClaw Skills](https://clawhub.ai/xiaojxiao2021/bazi-persona)
 2. [Bazi MCP](https://github.com/cantian-ai/bazi-mcp)
 3. [GPTs - Chinese Bazi Fortune Teller](https://chatgpt.com/g/g-67c3f7b74d148191a2167f44fd13412d-chinese-bazi-fortune-teller-can-tian-ba-zi-suan-ming-jing-zhun-pai-pan-jie-du)
 4. [iOS App - Cantian AI](https://apps.apple.com/app/id6746296534)

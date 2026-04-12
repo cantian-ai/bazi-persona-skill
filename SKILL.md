@@ -5,7 +5,7 @@ description: |
   切换到命理/阶段分析视角，以及查询黄历、节气、日期信息。
   常见触发包括：「帮我创建八字人格」「更新她最近的变化」「她最近工作忙吗」「从八字看她现在适不适合推进」「今天黄历怎么样」。
 argument-hint: "[natural language]"
-version: "0.2.0"
+version: "0.2.4"
 user-invocable: true
 allowed-tools: Read, Write, Glob
 ---
@@ -332,29 +332,39 @@ CLI 只负责已落盘文件的查看与删除，不负责创建、更新、聊�
 - `compat_guidance`：进入作弊模式、关系分析、合盘时提供命理解读视角
 - `knowledge.md`：统一承载共享 prompt 知识
 
+## 使用方式
+
+这套 skill 的主入口是当前对话本身。
+
+优先这样使用：
+
+- 在对话里创建人格
+- 在对话里更新人格
+- 在对话里继续聊天
+- 在对话里切到作弊模式做分析
+- 在对话里查询黄历、节气、日期
+
+只有在用户明确要查看、列出、删除本地文件时，才使用 CLI。
+
 ## 文件与数据
 
-人格默认只落在当前被调用的那一份 skill 副本自己的 `personas` 里：
+人格默认只落在当前被调用的那一份 skill 副本自己的 `personas/` 里。
 
-- `当前被调用的那一份 skill 目录/personas/<slug>/SKILL.md`
-- `当前被调用的那一份 skill 目录/personas/<slug>/persona.json`
-- `当前被调用的那一份 skill 目录/personas/<slug>/conversations.jsonl`
+默认会写出：
 
-这里的关键点是：
+- `当前被调用的 skill 目录/personas/<slug>/SKILL.md`
+- `当前被调用的 skill 目录/personas/<slug>/persona.json`
+- `当前被调用的 skill 目录/personas/<slug>/conversations.jsonl`
 
-- `npx skills add ... --all` 可能会把这个 skill 安装到多个 agent 各自的目录里
-- 真正读写时，只使用“当前这次会话实际调用到的那一份 skill 副本”旁边的 `personas`
-- 不要跨到别的 agent 的 skill 副本里找 persona
+读写时只使用“当前这次会话实际调用到的那一份 skill 副本”旁边的 `personas/`。
 
-例如，Claude Code 里当前这份 skill 如果装在 `~/.claude/skills/bazi-persona/`，那就读写它旁边的 `personas/`。
-
-不要自己去别的目录猜、搜或新建另一套 personas 目录。默认就按当前正在使用的这份 skill 副本旁边的 `personas` 读写。
+不要跨到别的 agent 的 skill 副本里找 persona，也不要自己额外猜、搜或新建另一套 personas 目录。
 
 其中：
 
-- `SKILL.md` 角色核心人格和背景设定
-- `persona.json` 详细八字参考内容（按需载入）
-- `conversations.jsonl` 历史聊天记录（按需载入）
+- `SKILL.md`：角色核心人格和背景设定
+- `persona.json`：结构化八字参考内容
+- `conversations.jsonl`：历史聊天记录
 
 `persona.json` 当前包含的重点字段：
 
@@ -364,26 +374,6 @@ CLI 只负责已落盘文件的查看与删除，不负责创建、更新、聊�
 - `memory`
 - `snapshot.reference_profile`
 - `snapshot.reference_state`
-
-## OpenClaw 兼容提示
-
-如果当前宿主是 OpenClaw，要特别避免把这个 skill 误判成需要现场构建的源码项目。
-
-判断原则：
-
-- 如果目录里已经有 `dist/`、`bin/`、`prompts/` 和 `SKILL.md`，就按可直接运行的 skill 处理
-- 不要因为看到 `package.json` 就默认执行 `npm run build`
-- 不要尝试补 `tsconfig.json`、`src/` 或其他源码文件
-- 这个 skill 可能仍然依赖少量运行时 npm 包；如果宿主平台会自动安装 `package.json` 里的 dependencies，可以使用平台默认行为
-- 只有在明确出现“缺少运行时依赖”的报错时，才补依赖；不要把“补依赖”升级成“重建源码项目”
-
-## 执行方式
-
-这套 skill 的主入口是当前对话本身。
-
-创建、更新、聊天、作弊模式分析、黄历查询，都优先在当前 agent 对话里完成。
-
-只有在用户明确要查看、列出、删除本地文件时，才使用 CLI。
 
 ## 质量标准
 

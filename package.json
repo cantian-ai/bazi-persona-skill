@@ -18,6 +18,7 @@
   "files": [
     "bin",
     "dist",
+    "openclaw",
     "prompts",
     "SKILL.md",
     "README.md",

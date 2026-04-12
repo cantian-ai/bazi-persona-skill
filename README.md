@@ -59,10 +59,10 @@ Bazi Persona Skill is an AI persona generator based on birth date for Claude Cod
 帮我执行 `npx skills add cantian-ai/bazi-persona-skill --all` 安装八字人格技能
 ```
 
-如果你在 **OpenClaw** 里使用，推荐直接从 ClawHub 安装：
+如果你在 **OpenClaw** 里使用，推荐直接用 OpenClaw 原生安装：
 
 ```bash
-clawhub install bazi-persona
+openclaw skills install bazi-persona
 ```
 
 ClawHub 页面：
@@ -274,7 +274,7 @@ bazi --action help
 
 关联项目：
 
-1. [OpenClaw Skills](https://clawhub.ai/tianlinle/cantian-bazi)
+1. [OpenClaw Skills](https://clawhub.ai/xiaojxiao2021/bazi-persona)
 2. [Bazi MCP](https://github.com/cantian-ai/bazi-mcp)
 3. [GPTs - Chinese Bazi Fortune Teller](https://chatgpt.com/g/g-67c3f7b74d148191a2167f44fd13412d-chinese-bazi-fortune-teller-can-tian-ba-zi-suan-ming-jing-zhun-pai-pan-jie-du)
 4. [iOS App - 参天AI](https://apps.apple.com/app/id6746296534)

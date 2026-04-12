@@ -55,7 +55,9 @@ Built for privacy, control, and Agent workflows.
 
 Paste this in any AI Agent chat:
 
-> Run `npx skills add cantian-ai/bazi-persona-skill --all` to install the Bazi persona skill
+```bash
+Run `npx skills add cantian-ai/bazi-persona-skill --all` to install the Bazi persona skill
+```
 
 If you use **OpenClaw**, the easiest way is to install it directly from ClawHub:
 

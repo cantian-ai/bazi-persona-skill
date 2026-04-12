@@ -55,7 +55,9 @@ Bazi Persona Skill is an AI persona generator based on birth date for Claude Cod
 
 在任意 AI Agent 對話框裡貼上這句話：
 
-> 幫我執行 `npx skills add cantian-ai/bazi-persona-skill --all` 安裝八字人格技能
+```bash
+幫我執行 `npx skills add cantian-ai/bazi-persona-skill --all` 安裝八字人格技能
+```
 
 如果你在 **OpenClaw** 裡使用，最方便的方式是直接從 ClawHub 安裝：
 

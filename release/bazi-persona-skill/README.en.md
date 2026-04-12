@@ -8,6 +8,7 @@ No manual character sheets. Start from a birthday, then chat, observe, and analy
 Bazi Persona Skill is an AI persona generator based on birth date for Claude Code, OpenClaw, and 45+ agent platforms.
 
 [![npm](https://img.shields.io/npm/v/bazi-persona-skill)](https://www.npmjs.com/package/bazi-persona-skill)
+[![publish](https://github.com/cantian-ai/bazi-persona-skill/actions/workflows/publish.yml/badge.svg)](https://github.com/cantian-ai/bazi-persona-skill/actions/workflows/publish.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 [简体中文](./README.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md)
@@ -55,6 +56,15 @@ Built for privacy, control, and Agent workflows.
 Paste this in any AI Agent chat:
 
 > Run `npx skills add cantian-ai/bazi-persona-skill --all` to install the Bazi persona skill
+
+If you use **OpenClaw**, the easiest way is to install it directly from ClawHub:
+
+```bash
+clawhub install bazi-persona
+```
+
+ClawHub page:
+https://clawhub.ai/xiaojxiao2021/bazi-persona
 
 Or run it yourself in the terminal:
 

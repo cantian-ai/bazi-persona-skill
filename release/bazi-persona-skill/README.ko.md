@@ -8,6 +8,7 @@
 Bazi Persona Skill is an AI persona generator based on birth date for Claude Code, OpenClaw, and 45+ agent platforms.
 
 [![npm](https://img.shields.io/npm/v/bazi-persona-skill)](https://www.npmjs.com/package/bazi-persona-skill)
+[![publish](https://github.com/cantian-ai/bazi-persona-skill/actions/workflows/publish.yml/badge.svg)](https://github.com/cantian-ai/bazi-persona-skill/actions/workflows/publish.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 [简体中文](./README.md) | [繁體中文](./README.zh-TW.md) | [English](./README.en.md) | [日本語](./README.ja.md)
@@ -55,6 +56,15 @@ Bazi Persona Skill is an AI persona generator based on birth date for Claude Cod
 AI Agent 대화창에 다음을 붙여넣기:
 
 > `npx skills add cantian-ai/bazi-persona-skill --all` 실행해서 사주 페르소나 스킬 설치해줘
+
+**OpenClaw** 에서 사용한다면 ClawHub에서 바로 설치하는 방법이 가장 쉽습니다:
+
+```bash
+clawhub install bazi-persona
+```
+
+ClawHub 페이지:
+https://clawhub.ai/xiaojxiao2021/bazi-persona
 
 또는 터미널에서 직접 실행:
 

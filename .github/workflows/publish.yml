@@ -60,11 +60,6 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
-
       - name: Prepare GitHub Packages tarball
         env:
           GITHUB_SCOPE: ${{ github.repository_owner }}
@@ -89,3 +84,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm publish "$PACKAGE_DIR" --ignore-scripts --registry=https://npm.pkg.github.com
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

@@ -55,7 +55,9 @@ Bazi Persona Skill is an AI persona generator based on birth date for Claude Cod
 
 AI Agent 대화창에 다음을 붙여넣기:
 
-> `npx skills add cantian-ai/bazi-persona-skill --all` 실행해서 사주 페르소나 스킬 설치해줘
+```bash
+`npx skills add cantian-ai/bazi-persona-skill --all` 실행해서 사주 페르소나 스킬 설치해줘
+```
 
 **OpenClaw** 에서 사용한다면 ClawHub에서 바로 설치하는 방법이 가장 쉽습니다:
 

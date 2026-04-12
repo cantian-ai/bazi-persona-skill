@@ -75,7 +75,7 @@ jobs:
           TARBALL=$(npm pack --pack-destination "$PACK_DIR")
           tar -xzf "$PACK_DIR/$TARBALL" -C "$PACK_DIR"
           PACKAGE_DIR="$PACK_DIR/package"
-          node -e "const fs=require('fs'); const path='$PACKAGE_DIR/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.name='@${SCOPE}/bazi-persona-skill'; pkg.publishConfig={...(pkg.publishConfig||{}), registry:'https://npm.pkg.github.com'}; fs.writeFileSync(path, JSON.stringify(pkg, null, 2)+'\n');"
+          node -e "const fs=require('fs'); const path='$PACKAGE_DIR/package.json'; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.name='@${SCOPE}/bazi-persona-skill'; pkg.publishConfig={...(pkg.publishConfig||{}), registry:'https://npm.pkg.github.com'}; if (pkg.scripts) delete pkg.scripts.prepublishOnly; fs.writeFileSync(path, JSON.stringify(pkg, null, 2)+'\n');"
           echo "PACKAGE_DIR=$PACKAGE_DIR" >> "$GITHUB_ENV"
 
       - name: Configure GitHub Packages registry
@@ -88,4 +88,4 @@ jobs:
       - name: Publish to GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm publish "$PACKAGE_DIR" --registry=https://npm.pkg.github.com
+        run: npm publish "$PACKAGE_DIR" --ignore-scripts --registry=https://npm.pkg.github.com

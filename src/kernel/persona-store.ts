@@ -20,23 +20,133 @@ import type {
   PromptPack,
   SupportedLanguage,
 } from "./types.js";
-import { regenerateSnapshot, renderPersonaSkill } from "./persona-engine.js";
+import { regenerateSnapshot, renderPersonaMarkdown } from "./persona-engine.js";
 
-function normalizeLoadedRecord(record: PersonaRecord): PersonaRecord {
-  const legacySnapshot = record.snapshot as PersonaRecord["snapshot"] & {
-    persona?: string;
-    state?: string;
-  };
-  if (legacySnapshot.reference_profile && legacySnapshot.reference_state) {
-    return record;
+const FILE_NAMES = {
+  persona: "persona.md",
+  bazi: "bazi_data.json",
+  memory: "memory.json",
+  history: "history.json",
+} as const;
+
+type BaziDataRecord = Omit<PersonaRecord, "memory" | "persona_markdown">;
+
+function personaDir(baseDir: string, slug: string): string {
+  return path.join(baseDir, slug);
+}
+
+function memoryFromUnknown(payload: unknown): PersonaMemoryEntry[] {
+  if (!Array.isArray(payload)) {
+    return [];
   }
+  const output: PersonaMemoryEntry[] = [];
+  for (const item of payload) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const source = item as Record<string, unknown>;
+    const content = typeof source.content === "string" ? source.content.trim() : "";
+    if (!content) {
+      continue;
+    }
+    const memoryType = source.type;
+    const type = memoryType === "correction" || memoryType === "style" || memoryType === "context"
+      ? memoryType
+      : "fact";
+    const normalized: PersonaMemoryEntry = {
+      type,
+      content,
+      source: typeof source.source === "string" ? source.source : "unknown",
+      created_at: typeof source.created_at === "string" ? source.created_at : nowIso(),
+    };
+    if (typeof source.memory_id === "string") {
+      normalized.memory_id = source.memory_id;
+    }
+    if (typeof source.key === "string") {
+      normalized.key = source.key;
+    }
+    if (typeof source.time_anchor === "string") {
+      normalized.time_anchor = source.time_anchor;
+    }
+    if (typeof source.importance === "number") {
+      normalized.importance = source.importance;
+    }
+    if (typeof source.confidence === "number") {
+      normalized.confidence = source.confidence;
+    }
+    if (typeof source.updated_at === "string") {
+      normalized.updated_at = source.updated_at;
+    }
+    output.push(normalized);
+  }
+  return output;
+}
+
+function historyFromUnknown(payload: unknown): PersonaConversationEntry[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  const output: PersonaConversationEntry[] = [];
+  for (const item of payload) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const source = item as Record<string, unknown>;
+    if (typeof source.content !== "string" || !source.content.trim()) {
+      continue;
+    }
+    const role = source.role === "assistant" ? "assistant" : "user";
+    const mode = source.mode === "analysis" || source.mode === "update" || source.mode === "create"
+      ? source.mode
+      : "chat";
+    const normalized: PersonaConversationEntry = {
+      session_id: typeof source.session_id === "string" ? source.session_id : `session-${Date.now()}`,
+      role,
+      content: source.content,
+      mode,
+      created_at: typeof source.created_at === "string" ? source.created_at : nowIso(),
+    };
+    if (typeof source.id === "string") {
+      normalized.id = source.id;
+    }
+    if (source.source_type === "text" || source.source_type === "json" || source.source_type === "ocr_text" || source.source_type === "chat") {
+      normalized.source_type = source.source_type;
+    }
+    output.push(normalized);
+  }
+  return output;
+}
+
+function normalizeLoadedRecord(record: Partial<PersonaRecord> & {
+  slug: string;
+  profile: PersonaRecord["profile"];
+  chart: PersonaRecord["chart"];
+  snapshot: PersonaRecord["snapshot"];
+  created_at: string;
+  updated_at: string;
+}): PersonaRecord {
   return {
-    ...record,
-    snapshot: {
-      ...record.snapshot,
-      reference_profile: legacySnapshot.reference_profile ?? legacySnapshot.persona ?? "",
-      reference_state: legacySnapshot.reference_state ?? legacySnapshot.state ?? "",
+    schema_version: "4.0.0",
+    slug: record.slug,
+    profile: record.profile,
+    relationships: Array.isArray(record.relationships) ? record.relationships : [],
+    active_relationships: Array.isArray(record.active_relationships) ? record.active_relationships : [],
+    preferences: {
+      preferred_language:
+        record.preferences?.preferred_language === "zh" ||
+        record.preferences?.preferred_language === "en" ||
+        record.preferences?.preferred_language === "ja" ||
+        record.preferences?.preferred_language === "ko"
+          ? record.preferences.preferred_language
+          : "auto",
+      analysis_mode: record.preferences?.analysis_mode === "cheatsheet" ? "cheatsheet" : "normal",
     },
+    chart: record.chart,
+    memory: Array.isArray(record.memory) ? record.memory : [],
+    snapshot: record.snapshot,
+    persona_markdown: typeof record.persona_markdown === "string" ? record.persona_markdown : undefined,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
   };
 }
 
@@ -44,179 +154,33 @@ export function resolvePersonaBaseDir(explicit?: string): string {
   return explicit ?? process.env.BAZI_PERSONA_HOME ?? DEFAULT_PERSONA_DIR;
 }
 
-function readJsonl<T>(filePath: string): T[] {
-  const raw = readUtf8IfExists(filePath).trim();
-  if (!raw) {
-    return [];
-  }
-  return raw
-    .split("\n")
-    .map((line) => {
-      try {
-        return JSON.parse(line) as T;
-      } catch {
-        return undefined;
-      }
-    })
-    .filter((item): item is T => Boolean(item));
-}
-
-function appendJsonl(filePath: string, payload: unknown): void {
-  ensureDir(path.dirname(filePath));
-  fs.appendFileSync(filePath, `${JSON.stringify(payload)}\n`, "utf8");
-}
-
-function parseMemoryEntry(entry: Record<string, unknown>): PersonaMemoryEntry | undefined {
-  const content = typeof entry.content === "string" ? entry.content.trim() : "";
-  if (!content) {
-    return undefined;
-  }
-  const type = typeof entry.type === "string" ? entry.type : "fact";
-  return {
-    type:
-      type === "correction" || type === "style_pattern" || type === "context_note"
-        ? type === "style_pattern"
-          ? "style"
-          : type === "context_note"
-            ? "context"
-            : "correction"
-        : "fact",
-    content,
-    source: typeof entry.source === "string" ? entry.source : "legacy",
-    created_at: typeof entry.created_at === "string" ? entry.created_at : nowIso(),
-  };
-}
-
-function normalizeLegacyGender(value: unknown): "男" | "女" {
-  if (value === "男" || value === "male") {
-    return "男";
-  }
-  return "女";
-}
-
-function buildRecordFromLegacy(params: {
+export function getPersonaFilePaths(slug: string, baseDir = DEFAULT_PERSONA_DIR): {
   dir: string;
-  promptPack: PromptPack;
-  knowledge: PersonaKnowledge;
-}): PersonaRecord | undefined {
-  const runtimeDir = path.join(params.dir, ".runtime");
-  const metaPath = path.join(runtimeDir, "meta.json");
-  const evidencePath = path.join(runtimeDir, "bazi.evidence.json");
-  if (!fileExists(metaPath) || !fileExists(evidencePath)) {
-    return undefined;
-  }
-
-  const meta = readJson<Record<string, unknown>>(metaPath);
-  const evidence = readJson<{ chart: PersonaRecord["chart"] }>(evidencePath);
-  const memoryNormal = readJsonl<Record<string, unknown>>(path.join(runtimeDir, "memory.normal.log.jsonl"));
-  const memoryFallback = readJsonl<Record<string, unknown>>(path.join(runtimeDir, "memory.log.jsonl"));
-  const legacyMemory = (memoryNormal.length > 0 ? memoryNormal : memoryFallback)
-    .map(parseMemoryEntry)
-    .filter((item): item is PersonaMemoryEntry => Boolean(item));
-
-  const slug = typeof meta.slug === "string" ? meta.slug : path.basename(params.dir);
-  const relationships = Array.isArray(meta.relationships)
-    ? meta.relationships.filter((item): item is string => typeof item === "string")
-    : [typeof meta.relation === "string" ? meta.relation : ""].filter(Boolean);
-  const activeRelationships = Array.isArray(meta.active_relationships)
-    ? meta.active_relationships.filter((item): item is string => typeof item === "string")
-    : relationships;
-  const preferredLanguage: "auto" | SupportedLanguage =
-    meta.preferred_language === "zh" || meta.preferred_language === "en" || meta.preferred_language === "ja" || meta.preferred_language === "ko"
-      ? meta.preferred_language
-      : "auto";
-
-  const baseRecord = {
-    schema_version: "3.0.0" as const,
-    slug,
-    profile: {
-      name: typeof meta.name === "string" ? meta.name : slug,
-      gender: normalizeLegacyGender(meta.gender),
-      birth_date: typeof (meta.birth as Record<string, unknown> | undefined)?.date === "string"
-        ? ((meta.birth as Record<string, unknown>).date as string)
-        : evidence.chart.birth_input.date,
-      birth_time: typeof (meta.birth as Record<string, unknown> | undefined)?.time === "string"
-        ? ((meta.birth as Record<string, unknown>).time as string)
-        : evidence.chart.birth_input.provided_time,
-      birth_location: typeof (meta.birth as Record<string, unknown> | undefined)?.location === "string"
-        ? ((meta.birth as Record<string, unknown>).location as string)
-        : evidence.chart.birth_input.location || undefined,
-      calendar_type: evidence.chart.birth_input.calendar_type,
-    },
-    relationships,
-    active_relationships: activeRelationships,
-    preferences: {
-      preferred_language: preferredLanguage,
-      analysis_mode: "normal" as const,
-    },
-    chart: evidence.chart,
-    memory: legacyMemory,
-  };
-
-  const snapshot = regenerateSnapshot({
-    record: baseRecord,
-    promptPack: params.promptPack,
-    knowledge: params.knowledge,
-  });
-
+  persona_md: string;
+  bazi_data_json: string;
+  memory_json: string;
+  history_json: string;
+} {
+  const resolvedBaseDir = resolvePersonaBaseDir(baseDir);
+  const dir = personaDir(resolvedBaseDir, slug);
   return {
-    ...baseRecord,
-    snapshot,
-    created_at: typeof meta.created_at === "string" ? meta.created_at : nowIso(),
-    updated_at: typeof meta.updated_at === "string" ? meta.updated_at : snapshot.generated_at,
+    dir,
+    persona_md: path.join(dir, FILE_NAMES.persona),
+    bazi_data_json: path.join(dir, FILE_NAMES.bazi),
+    memory_json: path.join(dir, FILE_NAMES.memory),
+    history_json: path.join(dir, FILE_NAMES.history),
   };
-}
-
-function purgeLegacyArtifacts(dir: string): void {
-  for (const fileName of ["SKILL.md", "meta.json", "chart.json"]) {
-    const target = path.join(dir, fileName);
-    if (fileExists(target)) {
-      fs.rmSync(target, { force: true });
-    }
-  }
-  const runtimeDir = path.join(dir, ".runtime");
-  if (fileExists(runtimeDir)) {
-    fs.rmSync(runtimeDir, { recursive: true, force: true });
-  }
-}
-
-export function migrateLegacyPersonas(params: {
-  baseDir?: string;
-  promptPack: PromptPack;
-  knowledge: PersonaKnowledge;
-}): void {
-  const baseDir = resolvePersonaBaseDir(params.baseDir);
-  ensureDir(baseDir);
-  for (const entry of fs.readdirSync(baseDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) {
-      continue;
-    }
-    const dir = path.join(baseDir, entry.name);
-    const personaPath = path.join(dir, "persona.json");
-    if (fileExists(personaPath)) {
-      continue;
-    }
-    const migrated = buildRecordFromLegacy({
-      dir,
-      promptPack: params.promptPack,
-      knowledge: params.knowledge,
-    });
-    if (!migrated) {
-      continue;
-    }
-    purgeLegacyArtifacts(dir);
-    savePersona(migrated, baseDir);
-  }
 }
 
 export function listPersonas(baseDir = DEFAULT_PERSONA_DIR): PersonaRef[] {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  ensureDir(baseDir);
-  return fs.readdirSync(baseDir, { withFileTypes: true })
+  const resolvedBaseDir = resolvePersonaBaseDir(baseDir);
+  ensureDir(resolvedBaseDir);
+
+  return fs.readdirSync(resolvedBaseDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(baseDir, entry.name, "persona.json"))
-    .filter((filePath) => fileExists(filePath))
-    .map((filePath) => readJson<PersonaRecord>(filePath))
+    .map((entry) => path.join(resolvedBaseDir, entry.name, FILE_NAMES.bazi))
+    .filter((baziPath) => fileExists(baziPath))
+    .map((baziPath) => readJson<BaziDataRecord>(baziPath))
     .map((record) => ({
       slug: record.slug,
       name: record.profile.name,
@@ -225,45 +189,95 @@ export function listPersonas(baseDir = DEFAULT_PERSONA_DIR): PersonaRef[] {
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
+export function searchPersonas(query: string, baseDir = DEFAULT_PERSONA_DIR): PersonaRef[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return listPersonas(baseDir);
+  }
+  return listPersonas(baseDir).filter((item) =>
+    item.slug.toLowerCase().includes(normalized) || item.name.toLowerCase().includes(normalized),
+  );
+}
+
 export function loadPersona(slug: string, baseDir = DEFAULT_PERSONA_DIR): PersonaRecord {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  const filePath = path.join(baseDir, slug, "persona.json");
-  if (!fileExists(filePath)) {
+  const paths = getPersonaFilePaths(slug, baseDir);
+  if (!fileExists(paths.bazi_data_json)) {
     throw new Error(`Persona not found: ${slug}`);
   }
-  return normalizeLoadedRecord(readJson<PersonaRecord>(filePath));
+
+  const baziData = readJson<BaziDataRecord>(paths.bazi_data_json);
+  const memory = fileExists(paths.memory_json)
+    ? memoryFromUnknown(readJson<unknown>(paths.memory_json))
+    : [];
+  const personaMarkdown = readUtf8IfExists(paths.persona_md).trim();
+
+  return normalizeLoadedRecord({
+    ...baziData,
+    memory,
+    persona_markdown: personaMarkdown || undefined,
+  });
 }
 
 export function savePersona(record: PersonaRecord, baseDir = DEFAULT_PERSONA_DIR): PersonaRecord {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  const dir = path.join(baseDir, record.slug);
-  ensureDir(dir);
-  writeJson(path.join(dir, "persona.json"), record);
-  writeUtf8(path.join(dir, "SKILL.md"), `${renderPersonaSkill(record)}\n`);
-  return record;
+  const resolvedBaseDir = resolvePersonaBaseDir(baseDir);
+  const normalized = normalizeLoadedRecord(record);
+  const paths = getPersonaFilePaths(normalized.slug, resolvedBaseDir);
+  ensureDir(paths.dir);
+
+  const baziPayload: BaziDataRecord = {
+    schema_version: normalized.schema_version,
+    slug: normalized.slug,
+    profile: normalized.profile,
+    relationships: normalized.relationships,
+    active_relationships: normalized.active_relationships,
+    preferences: normalized.preferences,
+    chart: normalized.chart,
+    snapshot: normalized.snapshot,
+    created_at: normalized.created_at,
+    updated_at: normalized.updated_at,
+  };
+
+  writeJson(paths.bazi_data_json, baziPayload);
+  writeJson(paths.memory_json, normalized.memory);
+  if (!fileExists(paths.history_json)) {
+    writeJson(paths.history_json, []);
+  }
+
+  const personaMarkdown = normalized.persona_markdown?.trim() || renderPersonaMarkdown(normalized);
+  writeUtf8(paths.persona_md, `${personaMarkdown.trim()}\n`);
+
+  return {
+    ...normalized,
+    persona_markdown: personaMarkdown.trim(),
+  };
 }
 
-export function appendConversationEntry(
+export function loadHistoryEntries(slug: string, baseDir = DEFAULT_PERSONA_DIR): PersonaConversationEntry[] {
+  const paths = getPersonaFilePaths(slug, baseDir);
+  if (!fileExists(paths.history_json)) {
+    return [];
+  }
+  return historyFromUnknown(readJson<unknown>(paths.history_json));
+}
+
+export function appendHistoryEntry(
   slug: string,
   entry: PersonaConversationEntry,
   baseDir = DEFAULT_PERSONA_DIR,
-): void {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  appendJsonl(path.join(baseDir, slug, "conversations.jsonl"), entry);
-}
-
-export function loadConversationEntries(slug: string, baseDir = DEFAULT_PERSONA_DIR): PersonaConversationEntry[] {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  return readJsonl<PersonaConversationEntry>(path.join(baseDir, slug, "conversations.jsonl"));
+): PersonaConversationEntry[] {
+  const paths = getPersonaFilePaths(slug, baseDir);
+  const entries = loadHistoryEntries(slug, baseDir);
+  entries.push(entry);
+  writeJson(paths.history_json, entries);
+  return entries;
 }
 
 export function deletePersona(slug: string, baseDir = DEFAULT_PERSONA_DIR): boolean {
-  baseDir = resolvePersonaBaseDir(baseDir);
-  const dir = path.join(baseDir, slug);
-  if (!fileExists(path.join(dir, "persona.json"))) {
+  const paths = getPersonaFilePaths(slug, baseDir);
+  if (!fileExists(paths.bazi_data_json)) {
     return false;
   }
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(paths.dir, { recursive: true, force: true });
   return true;
 }
 
@@ -285,7 +299,7 @@ export function createPersonaRecord(params: {
   const slug = toSlug(params.slug ?? params.name);
   const createdAt = nowIso();
   const baseRecord = {
-    schema_version: "3.0.0" as const,
+    schema_version: "4.0.0" as const,
     slug,
     profile: {
       name: params.name,
@@ -304,15 +318,20 @@ export function createPersonaRecord(params: {
     chart: params.chart,
     memory: params.memory,
   };
+
   const snapshot = regenerateSnapshot({
     record: baseRecord,
     promptPack: params.promptPack,
     knowledge: params.knowledge,
   });
-  return {
+
+  const assembled: PersonaRecord = {
     ...baseRecord,
     snapshot,
     created_at: createdAt,
     updated_at: snapshot.generated_at,
   };
+
+  assembled.persona_markdown = renderPersonaMarkdown(assembled);
+  return assembled;
 }

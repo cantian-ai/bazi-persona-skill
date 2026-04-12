@@ -8,7 +8,6 @@ on:
       - "openclaw/**"
       - "scripts/build-openclaw-release.sh"
       - "src/**"
-      - "bin/**"
       - "prompts/**"
       - "package.json"
       - "package-lock.json"

@@ -208,14 +208,14 @@ Claude Code / OpenClaw で `/bazi-persona` を使うか、自然言語でその�
 | やりたいこと | コマンド | 自然言語 |
 |---|---|---|
 | ペルソナ作成 | `/bazi-persona` | 「八字ペルソナを作って：花子、女性、1996年…」 |
-| 保存済み一覧を見る | `bazi --action inspect` | 「保存済みのペルソナを見せて」 |
-| ローカルの1件を見る | `bazi --action inspect --slug hanako` | 「花子の人格ファイルを見せて」 |
-| ローカルの1件を削除 | `bazi --action delete --slug hanako` | 「花子の人格を削除して」 |
+| 保存済み一覧を見る | `npm run bazi -- --action inspect` | 「保存済みのペルソナを見せて」 |
+| ローカルの1件を見る | `npm run bazi -- --action inspect --slug hanako` | 「花子の人格ファイルを見せて」 |
+| ローカルの1件を削除 | `npm run bazi -- --action delete --slug hanako` | 「花子の人格を削除して」 |
 | 会話開始 | `/bazi-persona` | 「花子と話したい」 |
 | 情報追加 | `/bazi-persona` | 「花子が昇進した、更新して」 |
 | チートモードを開く | `/bazi-persona` | 「花子との会話中に『チートモードをオンにして』と言う」 |
 | 暦 | `/bazi-persona` | 「今日の暦は？」 |
-| ヘルプ | `bazi --action help` | 「使い方を教えて」 |
+| ヘルプ | `npm run bazi -- --action help` | 「使い方を教えて」 |
 
 基本はユーザーの入力言語に追従します。判定が曖昧なときは先に中国語で始めます。
 
@@ -241,16 +241,18 @@ Claude Code / OpenClaw では `/bazi-persona` または自然言語だけで、�
 作成したペルソナはローカルに保存されます：
 
 ```text
-personas/<slug>/persona.json
-personas/<slug>/SKILL.md
+personas/<slug>/persona.md
+personas/<slug>/bazi_data.json
+personas/<slug>/memory.json
+personas/<slug>/history.json
 ```
 
 これらのローカルファイルを確認・整理したい場合は、次を使います：
 
 ```bash
-bazi --action inspect
-bazi --action inspect --slug hanako
-bazi --action delete --slug hanako
+npm run bazi -- --action inspect
+npm run bazi -- --action inspect --slug hanako
+npm run bazi -- --action delete --slug hanako
 ```
 
 ---
@@ -259,7 +261,7 @@ bazi --action delete --slug hanako
 
 ```bash
 npm install -g bazi-persona-skill
-bazi --action help
+npm run bazi -- --action help
 ```
 
 ---

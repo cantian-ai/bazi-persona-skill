@@ -21,7 +21,6 @@ Start a new OpenClaw session after install so the skill snapshot refreshes.
 
 - `SKILL.md`: OpenClaw-specific runtime and calling guidance
 - `dist/`: prebuilt runtime files
-- `bin/`: CLI entrypoint
 - `prompts/`: prompt and knowledge files used by the runtime
 - `package.json`: runtime dependency declaration for hosts that install dependencies automatically
 
@@ -59,6 +58,6 @@ OpenClaw can load same-named skills from multiple places. In practice, use the c
 When troubleshooting:
 
 1. Verify the active skill directory first.
-2. Verify `dist/`, `bin/`, `prompts/`, and `SKILL.md` are present.
+2. Verify `dist/`, `prompts/`, `package.json`, and `SKILL.md` are present.
 3. Verify runtime dependencies only if there is an explicit missing dependency error.
 4. Do not escalate missing paths into a source rebuild workflow.

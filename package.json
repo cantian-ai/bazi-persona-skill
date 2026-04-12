@@ -1,7 +1,7 @@
 {
   "name": "bazi-persona-skill",
-  "version": "0.2.4",
-  "description": "Prompt-first Bazi persona skill kernel",
+  "version": "0.3.0",
+  "description": "Awesome Bazi persona skill, generat AI person by Bazi Astrology",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -11,12 +11,7 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "bin": {
-    "bazi": "./bin/bazi.js",
-    "bazi-persona": "./bin/bazi.js"
-  },
   "files": [
-    "bin",
     "dist",
     "openclaw",
     "prompts",
@@ -36,6 +31,8 @@
     "persona",
     "ai-skill",
     "claude-code",
+    "openclaw",
+    "hermes",
     "八字",
     "命理"
   ],

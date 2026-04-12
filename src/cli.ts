@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import {
   deletePersona,
+  getPersonaFilePaths,
+  loadHistoryEntries,
   listPersonas,
-  loadConversationEntries,
   loadPersona,
   resolvePersonaBaseDir,
 } from "./kernel/persona-store.js";
@@ -26,19 +27,21 @@ export function inspectPersona(args: Record<string, string>): string {
   }
 
   const record = loadPersona(ref.slug, baseDir);
-  const conversations = loadConversationEntries(ref.slug, baseDir);
-  const skillPath = `${baseDir}/${record.slug}/SKILL.md`;
-  const skillContent = readUtf8IfExists(skillPath).trim();
+  const conversations = loadHistoryEntries(ref.slug, baseDir);
+  const filePaths = getPersonaFilePaths(record.slug, baseDir);
+  const personaMarkdown = readUtf8IfExists(filePaths.persona_md).trim();
   return [
     `${record.profile.name} (${record.slug})`,
-    `- File: ${baseDir}/${record.slug}/persona.json`,
-    `- Skill: ${skillPath}`,
+    `- Persona: ${filePaths.persona_md}`,
+    `- Bazi Data: ${filePaths.bazi_data_json}`,
+    `- Memory: ${filePaths.memory_json}`,
+    `- History: ${filePaths.history_json}`,
     `- Conversations: ${conversations.length}`,
     `- Updated: ${record.updated_at}`,
     `- Relation: ${record.active_relationships.join(" / ")}`,
     `- Memory count: ${record.memory.length}`,
     "",
-    skillContent || record.snapshot.reference_profile,
+    personaMarkdown || record.snapshot.reference_profile,
   ].join("\n");
 }
 
@@ -104,7 +107,7 @@ const cliTextPack: Record<SupportedLanguage, {
     storageOnly: "- This CLI is storage-only: inspect / list / delete stored persona files.",
     nonCli: "- Persona generation, updates, dialogue, flow analysis, and calendar lookup belong to the agent tool layer, not the CLI.",
     noShell: "- Do not use Bash/Node/tsx CLI calls to create personas or chat. Use the skill directly in the agent conversation.",
-    storedAt: "- Stored data lives in personas/<slug>/persona.json inside the installed skill directory.",
+    storedAt: "- Stored data lives in personas/<slug>/{persona.md,bazi_data.json,memory.json,history.json} inside the installed skill directory.",
     fileExamples: "文件查看示例：",
     chatExamples: "更常见的是直接在对话里这样用：",
     unsupported: (action) => `Unsupported CLI action: ${action}`,
@@ -137,7 +140,7 @@ const cliTextPack: Record<SupportedLanguage, {
     storageOnly: "- This CLI is storage-only: inspect / list / delete stored persona files.",
     nonCli: "- Persona generation, updates, dialogue, flow analysis, and calendar lookup belong to the agent tool layer, not the CLI.",
     noShell: "- Do not use Bash/Node/tsx CLI calls to create personas or chat. Use the skill directly in the agent conversation.",
-    storedAt: "- Stored data lives in personas/<slug>/persona.json inside the installed skill directory.",
+    storedAt: "- Stored data lives in personas/<slug>/{persona.md,bazi_data.json,memory.json,history.json} inside the installed skill directory.",
     fileExamples: "File-management examples:",
     chatExamples: "More commonly, use it directly in chat:",
     unsupported: (action) => `Unsupported CLI action: ${action}`,
@@ -170,7 +173,7 @@ const cliTextPack: Record<SupportedLanguage, {
     storageOnly: "- This CLI is storage-only: inspect / list / delete stored persona files.",
     nonCli: "- Persona generation, updates, dialogue, flow analysis, and calendar lookup belong to the agent tool layer, not the CLI.",
     noShell: "- Do not use Bash/Node/tsx CLI calls to create personas or chat. Use the skill directly in the agent conversation.",
-    storedAt: "- Stored data lives in personas/<slug>/persona.json inside the installed skill directory.",
+    storedAt: "- Stored data lives in personas/<slug>/{persona.md,bazi_data.json,memory.json,history.json} inside the installed skill directory.",
     fileExamples: "ファイル確認の例：",
     chatExamples: "ふだんは対話でこう使います：",
     unsupported: (action) => `Unsupported CLI action: ${action}`,
@@ -203,7 +206,7 @@ const cliTextPack: Record<SupportedLanguage, {
     storageOnly: "- This CLI is storage-only: inspect / list / delete stored persona files.",
     nonCli: "- Persona generation, updates, dialogue, flow analysis, and calendar lookup belong to the agent tool layer, not the CLI.",
     noShell: "- Do not use Bash/Node/tsx CLI calls to create personas or chat. Use the skill directly in the agent conversation.",
-    storedAt: "- Stored data lives in personas/<slug>/persona.json inside the installed skill directory.",
+    storedAt: "- Stored data lives in personas/<slug>/{persona.md,bazi_data.json,memory.json,history.json} inside the installed skill directory.",
     fileExamples: "파일 확인 예시:",
     chatExamples: "보통은 대화에서 이렇게 씁니다:",
     unsupported: (action) => `Unsupported CLI action: ${action}`,

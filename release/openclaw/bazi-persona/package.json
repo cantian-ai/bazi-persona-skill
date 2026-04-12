@@ -1,6 +1,6 @@
 {
   "name": "bazi-persona",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "private": true,
   "description": "OpenClaw runtime package for Bazi Persona",
   "type": "module",
@@ -11,10 +11,6 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
-  },
-  "bin": {
-    "bazi": "./bin/bazi.js",
-    "bazi-persona": "./bin/bazi.js"
   },
   "engines": {
     "node": ">=18"

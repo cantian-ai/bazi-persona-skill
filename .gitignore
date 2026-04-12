@@ -140,6 +140,7 @@ vite.config.ts.timestamp-*
 
 # Generated personas
 personas/
+release/
 
 # Local skill installation artifacts
 .agents/

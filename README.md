@@ -211,14 +211,14 @@ npx skills add cantian-ai/bazi-persona-skill
 | 你想做什么 | 命令 | 自然语言 |
 |---|---|---|
 | 创建人格 | `/bazi-persona` | 帮我创建八字人格：小A，女，1996年…… |
-| 查看所有人格 | `bazi --action inspect` | 我有哪些人格？ |
-| 查看指定人格文件 | `bazi --action inspect --slug xiao-a` | 看看小A的人设文件 |
-| 删除指定人格文件 | `bazi --action delete --slug xiao-a` | 删除小A这个人格 |
+| 查看所有人格 | `npm run bazi -- --action inspect` | 我有哪些人格？ |
+| 查看指定人格文件 | `npm run bazi -- --action inspect --slug xiao-a` | 看看小A的人设文件 |
+| 删除指定人格文件 | `npm run bazi -- --action delete --slug xiao-a` | 删除小A这个人格 |
 | 进入对话 | `/bazi-persona` | 我要跟小A聊天 |
 | 补充信息 | `/bazi-persona` | 小A最近升职了，帮我更新 |
 | 打开作弊模式 | `/bazi-persona` | 进入当前人格对话后，直接说：「打开作弊模式」 |
 | 万年历 | `/bazi-persona` | 今天黄历怎么样？ |
-| 帮助 | `bazi --action help` | 有哪些用法？ |
+| 帮助 | `npm run bazi -- --action help` | 有哪些用法？ |
 
 默认跟随用户当前输入语言；如果语言判断不明确，就先用中文。
 
@@ -244,16 +244,18 @@ npx skills add cantian-ai/bazi-persona-skill
 已创建的人格会保存在本地：
 
 ```text
-personas/<slug>/persona.json
-personas/<slug>/SKILL.md
+personas/<slug>/persona.md
+personas/<slug>/bazi_data.json
+personas/<slug>/memory.json
+personas/<slug>/history.json
 ```
 
 如果你想查看或清理这些本地文件，可以使用：
 
 ```bash
-bazi --action inspect
-bazi --action inspect --slug xiao-a
-bazi --action delete --slug xiao-a
+npm run bazi -- --action inspect
+npm run bazi -- --action inspect --slug xiao-a
+npm run bazi -- --action delete --slug xiao-a
 ```
 
 ---
@@ -262,7 +264,7 @@ bazi --action delete --slug xiao-a
 
 ```bash
 npm install -g bazi-persona-skill
-bazi --action help
+npm run bazi -- --action help
 ```
 
 ---

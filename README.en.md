@@ -208,14 +208,14 @@ Use `/bazi-persona` in Claude Code / OpenClaw, or just talk naturally.
 | What you want | Command | Natural language |
 |---|---|---|
 | Create persona | `/bazi-persona` | "Create a Bazi persona: Amy, female, 1996..." |
-| List stored personas | `bazi --action inspect` | "What personas do I have?" |
-| Inspect one local persona file | `bazi --action inspect --slug amy` | "Show me Amy's persona file" |
-| Delete one local persona file | `bazi --action delete --slug amy` | "Delete Amy's persona" |
+| List stored personas | `npm run bazi -- --action inspect` | "What personas do I have?" |
+| Inspect one local persona file | `npm run bazi -- --action inspect --slug amy` | "Show me Amy's persona file" |
+| Delete one local persona file | `npm run bazi -- --action delete --slug amy` | "Delete Amy's persona" |
 | Start chatting | `/bazi-persona` | "I want to talk to Amy" |
 | Add info | `/bazi-persona` | "Amy got promoted, update her" |
 | Turn on cheat mode | `/bazi-persona` | "While talking to Amy, just say: Turn on cheat mode" |
 | Calendar | `/bazi-persona` | "What does today's almanac say?" |
-| Help | `bazi --action help` | "What usage is available?" |
+| Help | `npm run bazi -- --action help` | "What usage is available?" |
 
 By default, the skill follows the user's current input language. If the language is unclear, it starts in Chinese.
 
@@ -241,16 +241,18 @@ Turn off cheat mode
 Created personas are stored locally:
 
 ```text
-personas/<slug>/persona.json
-personas/<slug>/SKILL.md
+personas/<slug>/persona.md
+personas/<slug>/bazi_data.json
+personas/<slug>/memory.json
+personas/<slug>/history.json
 ```
 
 If you want to inspect or clean up those local files, use:
 
 ```bash
-bazi --action inspect
-bazi --action inspect --slug amy
-bazi --action delete --slug amy
+npm run bazi -- --action inspect
+npm run bazi -- --action inspect --slug amy
+npm run bazi -- --action delete --slug amy
 ```
 
 ---
@@ -259,7 +261,7 @@ bazi --action delete --slug amy
 
 ```bash
 npm install -g bazi-persona-skill
-bazi --action help
+npm run bazi -- --action help
 ```
 
 ---

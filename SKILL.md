@@ -1,386 +1,290 @@
 ---
 name: bazi-persona
 description: |
-  八字人格Skill说明。适用于创建八字人格、补充新事实更新人格、直接和已有人格对话、
-  切换到命理/阶段分析视角，以及查询黄历、节气、日期信息。
-  常见触发包括：「帮我创建八字人格」「更新她最近的变化」「她最近工作忙吗」「从八字看她现在适不适合推进」「今天黄历怎么样」。
+  八字人格 Skill。用于创建、更新和对话的人格系统，支持八字排盘、动态流时分析（大运/流年/流月/流日/流时）和万年历/黄历查询。
 argument-hint: "[natural language]"
 version: "0.2.4"
 user-invocable: true
 allowed-tools: Read, Write, Glob
 ---
 
-# 八字人格
+# 八字人格 Bazi Persona
 
-基于生辰八字，生成一个会聊天、会判断、会变化的 AI 人格。
+**不用聊天记录，生日就能生成人格。**
 
-你不需要手动写人设，而是从生日出发，直接开始对话、观察和分析。
+八字人格是一套把八字排盘、命理知识、现实事实组织在一起的人格系统。  
+目标不是生成“标签报告”，而是生成一个可持续对话、可持续更新、可切换分析视角的人格成品。
 
-八字人格是一套把八字排盘、命理知识、现实事实组织在一起的角色产品。
+默认跟随用户当前输入语言；语言不明确时先用中文。
 
-它服务的是三类体验：
+## 1) 这个 Skill 做什么
 
-- 创建一个可以持续对话的人格
-- 在后续聊天里吸收现实变化，让人格继续演化
-- 在需要的时候切到命理/阶段分析视角，帮助理解“这个人现在为什么会这样”
+这套 skill 处理 8 类事情：
 
-最终产物不是报告，也不是标签清单，而是一个能被 agent 持续使用的人设成品。
+1. 创建人格（先排盘，再生成人格）
+2. 更新人格（补充事实、修正信息、补关系线索）
+3. 普通模式聊天（先像这个人自然说话）
+4. 作弊模式聊天（在人格口吻上叠加命理分析）
+5. 动态流时分析（大运/流年/流月/流日/流时）
+6. 黄历/万年历查询
+7. 外部聊天导入并提取候选事实
+8. 可选的人设启动注入（SOUL/agent 启动上下文）
 
-默认跟随用户当前输入语言开始；如果语言判断不明确，就先用中文。
+## 1.1) When NOT to Use
 
-## 这套 Skill 处理什么
+以下场景不适合用本 skill：
 
-这套 skill 主要处理 7 类事情：
+- 只想做纯闲聊，且不需要 persona、八字、流时、黄历信息。
+- 只做通用任务（编码、文档检索、翻译、报表等），应改用通用技能。
+- 没有创建/定位人格所需的关键信息（至少能明确目标对象，或提供 `name/gender/birth_date`）。
+- 医疗、法律、投资等高风险决策场景需要专业意见时，本 skill 只能提供参考视角。
 
-1. 创建一个新人格
-2. 补充新事实，更新人格
-3. 记录会影响人格理解的记忆
-4. 直接和已有人格对话
-5. 切到作弊模式做命理/关系/阶段分析
-6. 基于当前时间或指定时间查看动态状态变化
-7. 查询黄历、节气、日期信息
+## 1.2) 命令行运行方式（用于本地调试/文件管理）
 
-最常见的自然语言入口：
+在 skill 根目录执行：
 
-| 场景 | 用户会怎么说 |
-|---|---|
-| 创建人格 | 「帮我创建八字人格：舒晴，女，1999年8月12日，上海，同事」 |
-| 更新人格 | 「帮我更新舒晴：最近升职了，带团队以后更强调交付」 |
-| 补充记忆 | 「记一下：舒晴最近搬家了」 |
-| 直接对话 | 「舒晴最近工作忙吗」 |
-| 作弊模式 | 「打开作弊模式」 |
-| 动态状态 | 「昨天和今天聊起来感觉有点不一样」「从八字看她今天状态怎样」 |
-| 日期查询 | 「今天黄历怎么样」 |
+```bash
+npm i
+```
 
-## 用户怎么用
+推荐方式（已编译产物）：
 
-从用户视角，最常见的使用方式其实只有 4 种：
+```bash
+npm run bazi -- --action inspect
+npm run bazi -- --action inspect --slug xiao-a
+npm run bazi -- --action delete --slug xiao-a
+```
 
-1. 第一次创建一个人格
-2. 创建完后直接开始聊天
-3. 过一段时间回来，继续和同一个人格聊天
-4. 切到作弊模式，看这个人最近为什么会这样
+等价方式（直接运行 CLI）：
 
-最短示例：
+```bash
+node dist/cli.js --action inspect
+```
 
-- 第一次创建：`帮我创建八字人格：舒晴，女，1999年8月12日，上海，同事`
-- 创建后直接聊天：`舒晴最近工作忙吗`
-- 下次开新对话继续聊：`舒晴最近是不是有点累`
-- 切到作弊模式：`打开作弊模式`
-- 看动态状态：`从八字看，舒晴今天状态怎样`
+开发调试（需要 tsx）：
 
-## 当前能力
+```bash
+npx tsx src/cli.ts --action inspect
+```
 
-当前代码已经稳定支持这些能力：
+说明：
 
-- `createPersona`
-- `updatePersona`
-- `respond`
-- `queryFlow`
-- `queryCalendar`
-- `inspectPersona`
-- `loadPersona`
-- `buildBaziEvidence`
+- 命令行主要用于 `inspect/list/delete/help` 这类文件管理动作。
+- 创建人格、更新人格、聊天、流时分析、黄历查询优先按下方工具+工作流执行。
 
-这些能力分别对应：
+## 2) 工具说明（输入 / 输出）
 
-- 创建人格
-- 更新事实 / 记忆
-- 普通聊天 / 作弊模式聊天
-- 看当前阶段 / 大运状态 / 某个时间点下的动态状态
-- 看黄历、节气、日期
-- 查看已经落盘的人格文件
-- 读取某个人格的结构化数据
-- 把八字排盘整理成可用证据
+### 2.1 `bazi_chart_tool`
 
-CLI 只负责已落盘文件的查看与删除，不负责创建、更新、聊天或分析。
+用途：八字排盘 + 固定人格知识映射（静态）。
 
-## 创建人格
+入参：
 
-当用户发来一条完整或接近完整的创建请求时，直接在当前对话里完成创建。
+- `name` string 必填
+- `gender` string 必填，`male` / `female`（兼容 `男` / `女`）
+- `birth_date` string 必填，`YYYY-MM-DD`
+- `birth_time` string 可选，`HH:mm`
+- `birth_location` string 可选
+- `calendar_type` string 可选，`solar` / `lunar`，默认 `solar`
 
-### 创建时要拿到的信息
+结果说明：
 
-- 名字
-- 性别
-- 出生日期
-- 出生地点（可选）
-- 关系（可选）
+- 返回完整 `chart` 结果，后续用于人格生成、状态分析和命理依据引用。
 
-名字、性别、出生日期是创建时的关键字段。
+### 2.2 `bazi_flow_tool`
 
-如果出生地点或关系没有给出，不要因为这两个字段打断创建；直接继续排盘和生成人格。
+用途：动态八字查询（大运 / 流年 / 流月 / 流日 / 流时）。
 
-### 创建时要调用的能力
+入参：
 
-1. 八字排盘能力
-2. `prompts/create_persona.md`
+- `chart` object 可选（直接传本命）
+- `persona_slug` string 可选（从人格读取本命）
+- `base_dir` string 可选
+- `at` string 可选（如 `今天` / `昨天` / `2026-04-12`）
+- `include_calendar` boolean 可选，默认 `true`
+- `lang` string 可选，`zh` / `en` / `ja` / `ko`
 
-### 创建流程
+结果说明：
 
-1. 读取用户输入里的基础信息
-2. 调用八字排盘能力，拿到八字信息，包括但不限于：
-   - 四柱八字
-   - 日主
-   - 五行结构
-   - 主导十神
-   - 当前大运
-   - 当前阶段偏移
-3. 调用 `create_persona`
-4. 写出：
-   - `当前被调用的那一份 skill 目录/personas/<slug>/SKILL.md`
-   - `当前被调用的那一份 skill 目录/personas/<slug>/persona.json`
-   - `当前被调用的那一份 skill 目录/personas/<slug>/conversations.jsonl`
-5. 回复用户创建完成，并把用户带回聊天
+- 返回目标时点动态状态（当前大运、阶段偏移、沟通/判断变化）；
+- 可附带日期黄历信息（农历、干支、节气、宜忌等）。
 
-### 创建示例
+### 2.3 `persona_data_tool`
 
-如果用户说：
+用途：人设文件数据管理（List / Search / Create / Query / Patch(Update) / Delete）。
 
-`帮我创建八字人格：舒晴，女，1999年8月12日，上海，同事`
+入参：
 
-应该直接完成：
+- `action` string 必填：`list` / `search` / `create` / `query` / `patch` / `delete`
+- `base_dir` string 可选
+- `persona_slug` string（`query/patch/delete` 必填）
+- `search_query` string（`search` 可选）
+- `create_payload` object（`create` 必填）
+- `patch_payload` object（`patch` 必填）
 
-1. 识别这是创建请求
-2. 读取：
-   - 名字：舒晴
-   - 性别：女
-   - 出生日期：1999-08-12
-   - 出生地点：上海
-   - 关系：同事
-3. 排盘
-4. 调用 `create_persona`
-5. 落盘
-6. 回复：
-   - 已创建完成
-   - 现在可以直接和舒晴开始聊天了
+结果说明：
 
-如果用户缺少名字、性别、出生日期里的任意一个关键字段，只补问最少的一句，然后继续创建。
+- 返回对应动作结果和最新状态；
+- 在 `query/patch` 场景会返回人格文件位置，供聊天注入和后续更新。
 
-## 下次回来怎么继续聊
+### 2.4 `memory_tool`
 
-当用户在一个新对话里想继续和某个人设聊天时
+用途：关键记忆与知识的写入、更新、合并、查询。
 
-优先把这类说法当成明确唤起信号：
+入参：
 
-- `/bazi-persona 舒晴`
-- `帮我继续和舒晴聊天`
-- `我要和舒晴聊天`
-- `切换到舒晴`
-- `打开舒晴人格`
-- `从八字看，舒晴今天状态怎样`
+- `action` string 必填：`upsert` / `merge` / `delete` / `query`
+- `persona_slug` string 必填
+- `base_dir` string 可选
+- `memories` array（`upsert/merge` 必填）
+- `merge_policy` string 可选：`append` / `replace_same_key` / `higher_confidence_wins`
 
-如果是在原来已经在聊这个 persona 的同一个对话里继续说，可以直接顺着当前语境理解：
+结果说明：
 
-- `你最近是不是有点累`
-- `你为什么今天说话这么冲`
+- 返回写入/更新摘要（新增、更新、删除、冲突）；
+- 写入后会刷新人格快照，供后续聊天与分析使用。
 
-如果当前有多个人格，而用户又是在一个新对话里进来，就优先要求名字明确，不要自己猜。
+### 2.5 `calendar_tool`
 
-## 更新动态信息与记忆
+用途：万年历 / 黄历查询。
 
-当用户补充现实变化、纠正信息、关系变化或风格信息时，要把这些内容吸收到人格里。
+入参：
 
-### 这一步处理什么
+- `at` string 可选（默认今天）
+- `lang` string 可选
 
-- 新事实
-- 纠正信息
-- 最近经历
-- 关系变化
-- 说话风格或偏好
+结果说明：
 
-### 要调用的能力
+- 返回日期对应的公历、农历、干支、节气、宜忌等信息。
 
-1. `updatePersona`
-2. `prompts/memory_builder.md`
+### 2.6 `chat_import_tool`
 
-### 更新流程
+用途：导入外部聊天记录并提取候选事实。
 
-1. 找到对应 persona
-2. 从用户输入中提取新增事实
-3. 写入 `memory`
-4. 重新生成 `snapshot.reference_profile`
-5. 重新生成 `snapshot.reference_state`
-6. 重写 `SKILL.md`
-7. 把这轮输入输出记到 `conversations.jsonl`
+入参：
 
-### 更新后的结果
+- `source_type` string 必填：`text` / `json` / `ocr_text`
+- `payload` string 或 object 必填
+- `persona_slug` string 可选
+- `timezone` string 可选，默认 `Asia/Shanghai`
+- `max_candidates` number 可选，默认 `50`
 
-更新后，用户看到的不是“补丁说明”，而是：
+结果说明：
 
-- 人格成品更完整
-- 当前阶段更贴近现实
-- 后续对话会自然吸收这些变化
+- 返回结构化候选聊天项与候选记忆项；
+- AI 再筛选后进入 `memory_tool` 与 `persona_data_tool.patch`。
 
-## 基于时间的动态状态更新
+## 3) 工作流（按工具连接）
 
-当用户问的是“这两天为什么不太一样”“昨天和今天感觉不同”“从八字看她今天状态怎样”这类问题时，重点不是写入新的长期记忆，而是查看这个时间点下的动态状态。
+### 3.1 创建人格
 
-### 这一步处理什么
+适用场景：用户第一次创建某个人格。
 
-- 今天 / 昨天 / 明天的状态差异
-- 某个日期下的阶段偏移
-- 当前时间下更适合的沟通和推进节奏
+1. 提取基础信息：`name/gender/birth_date` 必要；`birth_time/birth_location/relationship` 可选。
+2. 调 `bazi_chart_tool` 得到 `chart`。
+3. 基于 `chart + relationship + initial_facts` 生成 `profile/snapshot`。
+4. 调 `persona_data_tool(action=create)` 写入人格文件。
+5. 有附加事实时调 `memory_tool(action=upsert)` 写入关键记忆。
+6. 返回创建完成并引导开始聊天。
 
-### 要调用的能力
+关键判断：
 
-1. `queryFlow`
-2. 必要时结合 `queryCalendar`
+- 缺 `name/gender/birth_date` 任一项时，先补问最少问题。
+- 同名人格存在时先确认覆盖还是新 slug。
 
-### 动态状态流程
+### 3.2 更新人格
 
-1. 找到对应 persona
-2. 识别用户问的是哪个时间点
-3. 以这个时间点作为状态锚点，查看当前大运、阶段偏移和当天节律
-4. 回复用户这一天为什么更像这样
-5. 不把这种短周期变化写成长期人格
+适用场景：补充新变化、纠正旧信息、补关系线索。
 
-### 典型例子
+1. 用 `persona_data_tool(search/query)` 定位目标人格。
+2. 从输入提取新增事实与纠正信息。
+3. 用 `memory_tool(upsert/merge)` 写记忆。
+4. 用 `persona_data_tool(patch)` 刷新 snapshot 与必要 profile 字段。
+5. 返回更新摘要。
 
-如果用户说：
+### 3.3 普通模式聊天
 
-`昨天和今天聊起来感觉有点不一样`
+适用场景：用户直接对某人格说话。
 
-应该理解为：
+1. 先判断上下文是否已有当前人格（`current_persona_slug`）。
+2. 已锁定且未切换对象时，直接 `persona_data_tool(query)`，不重复 search。
+3. 无上下文或用户明确切换时，先 `search` 再 `query`。
+4. 注入基础聊天提示词（`chat_base`）和 `persona.md`。
+5. 生成回复；需要沉淀时再调用 `memory_tool` + `persona_data_tool.patch`。
 
-- 这是动态状态问题
-- 先看这个人的当前阶段
-- 再看「昨天 / 今天」这个时间锚点下的状态差异
-- 最后回答为什么这两天会有不同的表达和节奏
+关键判断：
 
-## 直接对话
+- 多人格命中时先确认，不要猜。
+- 普通模式优先自然对话，不主动展开命理术语。
 
-当用户直接对某个人格说话时，重点是“像这个人自然回答”。
+### 3.4 人设启动注入（可选）
 
-### 要调用的能力
+适用场景：用户明确要求“按该 persona 启动聊天”或“写入 SOUL.md/agent 启动上下文”。
 
-1. `respond`
-2. 已有的 `persona.json`
-3. 已有的 `SKILL.md`
+1. 先按 3.3 定位目标 persona。
+2. 生成该 persona 专属启动提示词并注入当前会话上下文。
+3. 注入只对目标 persona 生效，不污染其他 persona。
 
-### 对话流程
+### 3.5 作弊模式聊天（命理增强）
 
-1. 识别用户在和谁说话
-2. 读取这个人格当前的结构化数据
-3. 如果当前不是作弊模式，就按普通聊天方式回应
-4. 回复后，把这一轮对话沉淀进 `conversations.jsonl`
+适用场景：用户说“打开作弊模式”“从八字看”“按命理分析一下”等。
 
-普通对话时：
+1. 先按 3.3 定位人格并注入普通模式基础内容。
+2. 再叠加作弊模式提示词（`cheat_mode`）。
+3. 按需注入 `bazi_data.json`。
+4. 涉及时间点时调 `bazi_flow_tool`，需要日期细节时补 `calendar_tool`。
+5. 输出保持人格口吻，同时给出可解释依据。
+6. 用户关闭作弊模式时，回到普通模式。
 
-- 先像这个人说话
-- 先回应眼前的问题
-- 命理依据放在背后支撑
+### 3.6 动态流时分析
 
-## 作弊模式与分析
+适用场景：用户问“今天状态”“这周为什么变了”“某天推进是否合适”。
 
-当用户明确进入作弊模式，切到分析视角。
+1. `persona_data_tool(query)` 读取目标人格。
+2. `bazi_flow_tool` 传 `persona_slug/chart + at`。
+3. 必要时补 `calendar_tool`。
+4. 输出结论 + 依据 + 节奏建议。
 
-### 明确信号
+### 3.7 黄历/万年历查询
 
-- `打开作弊模式`
+适用场景：只查日期信息，不涉及人格。
 
-### 要调用的能力
+1. 调 `calendar_tool`（`at` 可空，空则今天）。
+2. 返回农历、干支、节气、宜忌。
 
-1. `queryFlow`
-2. `respond` 的 analysis 模式
-3. 必要时结合 `queryCalendar`
-4. `prompts/compat_guidance.md`
+### 3.8 外部聊天导入
 
-### 分析时重点看什么
+适用场景：用户上传微信聊天记录、聊天截图文本或其他历史对话。
 
-1. 当前大运
-2. 当前阶段偏移
-3. 四柱、十神、五行结构
-4. 已有记忆和现实补充
+1. `chat_import_tool` 提取候选信息。
+2. AI 筛选高价值候选。
+3. `memory_tool` 写关键记忆。
+4. `persona_data_tool.patch` 刷新 snapshot。
+5. 返回导入摘要（写入/跳过/冲突）。
 
-输出时要回答：
+## 4) 人设目录（代码默认）
 
-- 最近为什么更像这样
-- 适不适合推进
-- 更适合什么节奏
-- 关系里最容易卡在哪
+默认目录：`<当前 skill 根目录>/personas`
 
-## 日期与黄历查询
+每个人格目录：
 
-日期查询是单独的一条工具线，不绑定某个已有人格。
+- `personas/<slug>/persona.md`：人设成品（聊天主注入文件）
+- `personas/<slug>/bazi_data.json`：八字结构化数据
+- `personas/<slug>/memory.json`：结构化记忆数据
+- `personas/<slug>/history.json`：结构化历史会话/导入记录
 
-### 要调用的能力
+覆盖优先级：
 
-1. `queryCalendar`
+1. 显式 `base-dir`
+2. 环境变量 `BAZI_PERSONA_HOME`
+3. 默认 `<skill-root>/personas`
 
-### 处理内容
+## 5) 质量标准
 
-- 黄历
-- 节气
-- 干支日期
-- 宜忌
+高质量八字人格至少满足：
 
-## Prompt 与知识
-
-当前 prompt 文件：
-
-1. `prompts/create_persona.md`
-2. `prompts/memory_builder.md`
-3. `prompts/compat_guidance.md`
-4. `prompts/manifest.json`
-5. `prompts/knowledge.md`
-
-它们的分工是：
-
-- `create_persona`：首次创建时，把排盘、长期人格、当前阶段和最终成品一次组装完成
-- `memory_builder`：用户补充新事实后，把这些内容整理进记忆和更新结果里
-- `compat_guidance`：进入作弊模式、关系分析、合盘时提供命理解读视角
-- `knowledge.md`：统一承载共享 prompt 知识
-
-## 使用方式
-
-这套 skill 的主入口是当前对话本身。
-
-优先这样使用：
-
-- 在对话里创建人格
-- 在对话里更新人格
-- 在对话里继续聊天
-- 在对话里切到作弊模式做分析
-- 在对话里查询黄历、节气、日期
-
-只有在用户明确要查看、列出、删除本地文件时，才使用 CLI。
-
-## 文件与数据
-
-人格默认只落在当前被调用的那一份 skill 副本自己的 `personas/` 里。
-
-默认会写出：
-
-- `当前被调用的 skill 目录/personas/<slug>/SKILL.md`
-- `当前被调用的 skill 目录/personas/<slug>/persona.json`
-- `当前被调用的 skill 目录/personas/<slug>/conversations.jsonl`
-
-读写时只使用“当前这次会话实际调用到的那一份 skill 副本”旁边的 `personas/`。
-
-不要跨到别的 agent 的 skill 副本里找 persona，也不要自己额外猜、搜或新建另一套 personas 目录。
-
-其中：
-
-- `SKILL.md`：角色核心人格和背景设定
-- `persona.json`：结构化八字参考内容
-- `conversations.jsonl`：历史聊天记录
-
-`persona.json` 当前包含的重点字段：
-
-- `profile`
-- `chart`
-- `relationships`
-- `memory`
-- `snapshot.reference_profile`
-- `snapshot.reference_state`
-
-## 质量标准
-
-一个高质量的八字人格，通常要同时满足：
-
-1. 像一个人，而不是一份模板
-2. 创建后可以立刻开始聊天
-3. 补充新事实后能自然更新
-4. 普通对话和分析视角（作弊模式）切换自然，互不干扰
-5. 关键判断能回到八字证据和现实信息找到依据
+1. 像一个人，不像模板标签。
+2. 创建后能立刻开始聊天。
+3. 更新后能自然吸收现实变化。
+4. 普通模式与作弊模式切换自然，不互相污染。
+5. 关键判断能回到八字证据与现实信息。

@@ -2,27 +2,28 @@ import type { BaziChart } from "../tools/bazi/calc.js";
 
 export type SupportedLanguage = "zh" | "en" | "ja" | "ko";
 export type PersonaMemoryType = "fact" | "correction" | "style" | "context";
-export type RoutedAction =
-  | "help"
-  | "create"
-  | "update"
-  | "inspect"
-  | "flow"
-  | "calendar"
-  | "respond";
+export type RoutedAction = "help" | "create" | "update" | "inspect" | "flow" | "calendar" | "respond";
 
 export interface PersonaMemoryEntry {
+  memory_id?: string;
   type: PersonaMemoryType;
+  key?: string;
   content: string;
   source: string;
+  time_anchor?: string;
+  importance?: number;
+  confidence?: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface PersonaConversationEntry {
+  id?: string;
   session_id: string;
   role: "user" | "assistant";
   content: string;
   mode: "chat" | "analysis" | "update" | "create";
+  source_type?: "text" | "json" | "ocr_text" | "chat";
   created_at: string;
 }
 
@@ -47,17 +48,19 @@ export interface PersonaSnapshot {
   reference_state: string;
 }
 
+export interface PersonaProfile {
+  name: string;
+  gender: "男" | "女";
+  birth_date: string;
+  birth_time?: string;
+  birth_location?: string;
+  calendar_type: "solar" | "lunar";
+}
+
 export interface PersonaRecord {
-  schema_version: "3.0.0";
+  schema_version: "4.0.0";
   slug: string;
-  profile: {
-    name: string;
-    gender: "男" | "女";
-    birth_date: string;
-    birth_time?: string;
-    birth_location?: string;
-    calendar_type: "solar" | "lunar";
-  };
+  profile: PersonaProfile;
   relationships: string[];
   active_relationships: string[];
   preferences: {
@@ -67,6 +70,7 @@ export interface PersonaRecord {
   chart: BaziChart;
   memory: PersonaMemoryEntry[];
   snapshot: PersonaSnapshot;
+  persona_markdown?: string;
   created_at: string;
   updated_at: string;
 }
@@ -132,4 +136,71 @@ export interface RoutedIntent {
   action: RoutedAction;
   payload: string;
   analysis_mode: "normal" | "cheatsheet";
+}
+
+export interface BaziChartToolInput {
+  name: string;
+  gender: "male" | "female" | "男" | "女";
+  birth_date: string;
+  birth_time?: string;
+  birth_location?: string;
+  calendar_type?: "solar" | "lunar";
+  sect?: 1 | 2;
+  true_solar_mode?: "auto" | "on" | "off";
+  longitude?: number;
+  day_rollover_hour?: number;
+}
+
+export interface BaziFlowToolInput {
+  chart?: BaziChart;
+  persona_slug?: string;
+  base_dir?: string;
+  at?: string;
+  include_calendar?: boolean;
+  lang?: SupportedLanguage;
+}
+
+export interface CalendarToolInput {
+  at?: string;
+  lang?: SupportedLanguage;
+}
+
+export interface ChatImportToolInput {
+  source_type: "text" | "json" | "ocr_text";
+  payload: string | Record<string, unknown> | Array<unknown>;
+  persona_slug?: string;
+  timezone?: string;
+  max_candidates?: number;
+}
+
+export interface PersonaDataToolInput {
+  action: "list" | "search" | "create" | "query" | "patch" | "delete";
+  base_dir?: string;
+  persona_slug?: string;
+  search_query?: string;
+  create_payload?: {
+    slug?: string;
+    profile?: Partial<PersonaProfile>;
+    relationship?: string;
+    initial_facts?: string[];
+    chart?: BaziChart;
+    snapshot?: PersonaSnapshot;
+    memory?: PersonaMemoryEntry[];
+  };
+  patch_payload?: {
+    memory_append?: PersonaMemoryEntry[];
+    snapshot_replace?: Partial<PersonaSnapshot>;
+    profile_patch?: Partial<PersonaProfile>;
+    relationship?: string;
+    analysis_mode?: "normal" | "cheatsheet";
+  };
+}
+
+export interface MemoryToolInput {
+  action: "upsert" | "merge" | "delete" | "query";
+  persona_slug: string;
+  base_dir?: string;
+  memories?: PersonaMemoryEntry[];
+  merge_policy?: "append" | "replace_same_key" | "higher_confidence_wins";
+  query?: string;
 }

@@ -1022,23 +1022,14 @@ export function regenerateSnapshot(params: {
   return buildPersonaMarkdown(params);
 }
 
-export function renderPersonaSkill(record: PersonaRecord): string {
+export function renderPersonaMarkdown(record: PersonaRecord): string {
   const language = resolveLanguage("", record.preferences.preferred_language);
   const pack = localePack[language];
-  const relation = record.active_relationships.join(" / ").trim();
-  const description = pack.generatedDescription(record.profile.name, relation);
 
   return [
-    "---",
-    `name: ${record.slug}`,
-    "description: |",
-    indentDescription(description),
-    "---",
-    "",
-    pack.youAre(record.profile.name),
-    ...pack.intro,
-    "",
     `# ${record.profile.name}`,
+    "",
+    ...pack.intro,
     "",
     ...buildEntrySection(record),
     "",

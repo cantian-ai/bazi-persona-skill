@@ -208,14 +208,14 @@ Claude Code / OpenClaw에서 `/bazi-persona`를 사용하거나, 자연어로 �
 | 하고 싶은 것 | 명령어 | 자연어 |
 |---|---|---|
 | 페르소나 생성 | `/bazi-persona` | "사주 페르소나 만들어줘: 수진, 여자, 1996…" |
-| 저장된 목록 보기 | `bazi --action inspect` | "내 페르소나 목록 보여줘" |
-| 로컬 파일 한 건 보기 | `bazi --action inspect --slug sujin` | "수진 페르소나 파일 보여줘" |
-| 로컬 파일 한 건 삭제 | `bazi --action delete --slug sujin` | "수진 페르소나 삭제해줘" |
+| 저장된 목록 보기 | `npm run bazi -- --action inspect` | "내 페르소나 목록 보여줘" |
+| 로컬 파일 한 건 보기 | `npm run bazi -- --action inspect --slug sujin` | "수진 페르소나 파일 보여줘" |
+| 로컬 파일 한 건 삭제 | `npm run bazi -- --action delete --slug sujin` | "수진 페르소나 삭제해줘" |
 | 대화 시작 | `/bazi-persona` | "수진이랑 대화하고 싶어" |
 | 정보 추가 | `/bazi-persona` | "수진이 승진했어, 업데이트해줘" |
 | 치트 모드 켜기 | `/bazi-persona` | "수진과 대화 중에 '치트 모드 켜줘'라고 말하기" |
 | 달력 | `/bazi-persona` | "오늘 황력은?" |
-| 도움말 | `bazi --action help` | "사용법 알려줘" |
+| 도움말 | `npm run bazi -- --action help` | "사용법 알려줘" |
 
 기본적으로 사용자의 현재 입력 언어를 따릅니다. 언어가 애매하면 먼저 중국어로 시작합니다.
 
@@ -241,16 +241,18 @@ Claude Code / OpenClaw에서는 `/bazi-persona` 또는 자연어만으로 생성
 생성된 페르소나는 로컬에 저장됩니다:
 
 ```text
-personas/<slug>/persona.json
-personas/<slug>/SKILL.md
+personas/<slug>/persona.md
+personas/<slug>/bazi_data.json
+personas/<slug>/memory.json
+personas/<slug>/history.json
 ```
 
 이 로컬 파일을 확인하거나 정리하려면 다음을 사용하세요:
 
 ```bash
-bazi --action inspect
-bazi --action inspect --slug sujin
-bazi --action delete --slug sujin
+npm run bazi -- --action inspect
+npm run bazi -- --action inspect --slug sujin
+npm run bazi -- --action delete --slug sujin
 ```
 
 ---
@@ -259,7 +261,7 @@ bazi --action delete --slug sujin
 
 ```bash
 npm install -g bazi-persona-skill
-bazi --action help
+npm run bazi -- --action help
 ```
 
 ---

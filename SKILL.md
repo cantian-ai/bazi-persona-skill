@@ -365,6 +365,18 @@ CLI 只负责已落盘文件的查看与删除，不负责创建、更新、聊�
 - `snapshot.reference_profile`
 - `snapshot.reference_state`
 
+## OpenClaw 兼容提示
+
+如果当前宿主是 OpenClaw，要特别避免把这个 skill 误判成需要现场构建的源码项目。
+
+判断原则：
+
+- 如果目录里已经有 `dist/`、`bin/`、`prompts/` 和 `SKILL.md`，就按可直接运行的 skill 处理
+- 不要因为看到 `package.json` 就默认执行 `npm run build`
+- 不要尝试补 `tsconfig.json`、`src/` 或其他源码文件
+- 这个 skill 可能仍然依赖少量运行时 npm 包；如果宿主平台会自动安装 `package.json` 里的 dependencies，可以使用平台默认行为
+- 只有在明确出现“缺少运行时依赖”的报错时，才补依赖；不要把“补依赖”升级成“重建源码项目”
+
 ## 执行方式
 
 这套 skill 的主入口是当前对话本身。

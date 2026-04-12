@@ -56,6 +56,10 @@ Paste this in any AI Agent chat:
 
 > Run `npx skills add cantian-ai/bazi-persona-skill --all` to install the Bazi persona skill
 
+If you use **OpenClaw**, the easiest way is to install it directly from ClawHub:
+
+> Open [ClawHub · bazi-persona](https://clawhub.ai/xiaojxiao2021/bazi-persona) and follow the instructions on the page
+
 Or run it yourself in the terminal:
 
 ```bash
